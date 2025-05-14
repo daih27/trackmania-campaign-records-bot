@@ -82,9 +82,46 @@ export async function initDatabase() {
       guild_id TEXT NOT NULL UNIQUE,
       language TEXT DEFAULT 'en',
       records_channel_id TEXT,
+      weekly_shorts_channel_id TEXT,
       default_country TEXT DEFAULT 'CHI', 
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+    
+    CREATE TABLE IF NOT EXISTS weekly_short_maps (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      map_uid TEXT NOT NULL UNIQUE,
+      map_id TEXT,
+      name TEXT,
+      season_uid TEXT,
+      position INTEGER,
+      thumbnail_url TEXT,
+      last_checked TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+    
+    CREATE TABLE IF NOT EXISTS weekly_short_records (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      player_id INTEGER NOT NULL,
+      map_id INTEGER NOT NULL,
+      position INTEGER NOT NULL,
+      timestamp INTEGER,
+      recorded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      announced BOOLEAN DEFAULT 0,
+      FOREIGN KEY(player_id) REFERENCES players(id) ON DELETE CASCADE,
+      FOREIGN KEY(map_id) REFERENCES weekly_short_maps(id) ON DELETE CASCADE,
+      UNIQUE(player_id, map_id)
+    );
+    
+    CREATE TABLE IF NOT EXISTS weekly_short_history (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      player_id INTEGER NOT NULL,
+      map_id INTEGER NOT NULL,
+      position INTEGER NOT NULL,
+      previous_position INTEGER,
+      timestamp INTEGER,
+      recorded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY(player_id) REFERENCES players(id) ON DELETE CASCADE,
+      FOREIGN KEY(map_id) REFERENCES weekly_short_maps(id) ON DELETE CASCADE
     );
   `);
 

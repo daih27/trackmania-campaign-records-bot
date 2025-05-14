@@ -1,5 +1,5 @@
 import { Client, GatewayIntentBits, EmbedBuilder, REST, Routes, SlashCommandBuilder, PermissionFlagsBits } from 'discord.js';
-import { discordToken, tmOAuthClientId, tmOAuthClientSecret, TRACKMANIA_ICON_URL, RECORD_CHECK_INTERVAL, INITIAL_RECORD_CHECK_DELAY } from './config.js';
+import { discordToken, tmOAuthClientId, tmOAuthClientSecret, TRACKMANIA_ICON_URL, RECORD_CHECK_INTERVAL, WEEKLY_SHORTS_CHECK_INTERVAL, INITIAL_RECORD_CHECK_DELAY } from './config.js';
 import { startDefaultSchedules, clearAllSchedules, scheduleTask } from './utils/scheduler.js';
 import { commandQueue, recordCheckQueue } from './utils/taskQueue.js';
 import { registerPlayer, unregisterPlayer, getPlayerByDiscordId } from './playerManager.js';
@@ -7,8 +7,17 @@ import { getDisplayNames } from './oauth.js';
 import { formatTime, log } from './utils.js';
 import { getDb } from './db.js';
 import { getTranslations, setLanguage, getAvailableLanguages, formatString } from './localization/index.js';
-import { setDefaultCountry, getAvailableCountries, setAnnouncementChannel } from './guildSettings.js';
+import { setDefaultCountry, getAvailableCountries, setAnnouncementChannel, setWeeklyShortsAnnouncementChannel } from './guildSettings.js';
 import { REGIONS, getCountryName } from './config/regions.js';
+import { getDefaultCountry } from './guildSettings.js';
+import {
+    fetchCurrentWeeklyShort,
+    fetchWeeklyShortSeasonLeaderboard,
+    fetchWeeklyShortCountryLeaderboard,
+    createWeeklyShortSeasonLeaderboardEmbed,
+    createWeeklyShortMapLeaderboardEmbed
+} from './weeklyShorts.js';
+import { fetchMapInfo, fetchPlayerNames } from './recordTracker.js';
 
 /**
  * Defines all available slash commands for the Discord bot with their options and descriptions
@@ -43,6 +52,24 @@ function getCommands(t) {
             .addStringOption(option => {
                 const opt = option.setName('country')
                     .setDescription(t.commands.leaderboardCountryOption || 'Select a country')
+                    .setRequired(false);
+                Object.keys(REGIONS).forEach(code => {
+                    opt.addChoices({ name: getCountryName(code), value: code });
+                });
+
+                return opt;
+            }),
+
+        new SlashCommandBuilder()
+            .setName('weeklyshortsleaderboard')
+            .setDescription(t.commands.weeklyshortsleaderboard || 'Show weekly shorts leaderboard')
+            .addStringOption(option =>
+                option.setName('map')
+                    .setDescription(t.commands.weeklyshortsleaderboardOption || 'Optional: filter by map name')
+                    .setRequired(false))
+            .addStringOption(option => {
+                const opt = option.setName('country')
+                    .setDescription(t.commands.weeklyshortsleaderboardCountryOption || 'Select a country')
                     .setRequired(false);
                 Object.keys(REGIONS).forEach(code => {
                     opt.addChoices({ name: getCountryName(code), value: code });
@@ -93,6 +120,14 @@ function getCommands(t) {
             .addChannelOption(option =>
                 option.setName('channel')
                     .setDescription(t.commands.setchannelOption || 'The channel to send record announcements to')
+                    .setRequired(true)),
+
+        new SlashCommandBuilder()
+            .setName('setweeklyshortschannel')
+            .setDescription(t.commands.setweeklyshortschannel || 'Set the channel for weekly shorts announcements')
+            .addChannelOption(option =>
+                option.setName('channel')
+                    .setDescription(t.commands.setweeklyshortschannelOption || 'The channel to send weekly shorts announcements to')
                     .setRequired(true)),
     ].map(command => command.toJSON());
 }
@@ -291,6 +326,10 @@ async function handleHelp(interaction) {
                 value: t.embeds.help.leaderboardDesc
             },
             {
+                name: t.embeds.help.weeklyshortsleaderboard || '/weeklyshortsleaderboard',
+                value: t.embeds.help.weeklyshortsleaderboardDesc || 'Show weekly shorts leaderboard (overall or by map)'
+            },
+            {
                 name: t.embeds.help.help,
                 value: t.embeds.help.helpDesc
             },
@@ -309,6 +348,10 @@ async function handleHelp(interaction) {
             {
                 name: t.embeds.help.setchannel || '/setchannel',
                 value: t.embeds.help.setchannelDesc || 'Set the channel for record announcements (Admin/Mod only)'
+            },
+            {
+                name: t.embeds.help.setweeklyshortschannel || '/setweeklyshortschannel',
+                value: t.embeds.help.setweeklyshortschannelDesc || 'Set the channel for weekly shorts announcements (Admin/Mod only)'
             },
             {
                 name: t.embeds.help.updateDisplayNames || '/update-display-names',
@@ -359,6 +402,12 @@ async function handleInteraction(interaction) {
                     break;
                 case 'setchannel':
                     await handleSetChannel(interaction);
+                    break;
+                case 'setweeklyshortschannel':
+                    await handleSetWeeklyShortsChannel(interaction);
+                    break;
+                case 'weeklyshortsleaderboard':
+                    await handleWeeklyShortsLeaderboard(interaction);
                     break;
                 default:
                     await interaction.reply(t.responses.error.unknownCommand);
@@ -495,7 +544,211 @@ async function handleSetChannel(interaction) {
     }
 }
 
+/**
+ * Handles the /setweeklyshortschannel command to configure where weekly shorts announcements are posted
+ * Admin/Moderator-only command
+ * @param {Interaction} interaction - Discord interaction object
+ */
+async function handleSetWeeklyShortsChannel(interaction) {
+    const t = await getTranslations(interaction.guildId);
+
+    if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator) &&
+        !interaction.member.permissions.has(PermissionFlagsBits.ModerateMembers)) {
+        return await interaction.reply({
+            content: t.responses.setweeklyshortschannel?.noPermission ||
+                'You need administrator or moderator permissions to use this command.',
+            ephemeral: true
+        });
+    }
+
+    try {
+        await interaction.deferReply();
+        const channel = interaction.options.getChannel('channel');
+        const guildId = interaction.guildId;
+
+        if (!channel.isTextBased()) {
+            return await interaction.editReply(
+                t.responses.setweeklyshortschannel?.notText ||
+                'The selected channel must be a text channel.'
+            );
+        }
+
+        const result = await setWeeklyShortsAnnouncementChannel(guildId, channel.id);
+
+        if (!result) {
+            return await interaction.editReply(
+                t.responses.setweeklyshortschannel?.error ||
+                '❌ Failed to set the weekly shorts announcement channel.'
+            );
+        }
+
+        await interaction.editReply(
+            formatString(
+                t.responses.setweeklyshortschannel?.changed ||
+                '✅ Weekly shorts announcements will now be sent to {channel}',
+                { channel: `<#${channel.id}>` }
+            )
+        );
+    } catch (error) {
+        log(`Error in setweeklyshortschannel command: ${error.message}`, 'error');
+        await interaction.editReply(
+            t.responses.setweeklyshortschannel?.error ||
+            '❌ An error occurred while setting the channel.'
+        );
+    }
+}
+
 import handleLeaderboardModule from './handleLeaderboard.js';
+
+/**
+ * Handles the /weeklyshortsleaderboard command
+ * @param {Interaction} interaction - Discord interaction object
+ */
+async function handleWeeklyShortsLeaderboard(interaction) {
+    const t = await getTranslations(interaction.guildId);
+
+    try {
+        await interaction.deferReply();
+
+        const mapName = interaction.options.getString('map');
+        const countryCode = interaction.options.getString('country') || await getDefaultCountry(interaction.guildId);
+
+        if (mapName) {
+            // Show leaderboard for a specific map
+            await showWeeklyShortMapLeaderboard(interaction, mapName, countryCode, t);
+        } else {
+            // Show overall weekly shorts standings
+            await showWeeklyShortOverallLeaderboard(interaction, countryCode, t);
+        }
+    } catch (error) {
+        log(`Error in weeklyshortsleaderboard command: ${error.message}`, 'error');
+        await interaction.editReply(
+            t.responses.weeklyshortsleaderboard?.error ||
+            '❌ An error occurred while fetching the weekly shorts leaderboard.'
+        );
+    }
+}
+
+/**
+ * Shows the overall weekly shorts standings
+ * @param {Interaction} interaction - Discord interaction object
+ * @param {string} countryCode - Country code to filter by
+ * @param {Object} t - Translation strings
+ */
+async function showWeeklyShortOverallLeaderboard(interaction, countryCode, t) {
+    try {
+        const campaign = await fetchCurrentWeeklyShort();
+        const seasonUid = campaign.seasonUid;
+
+        // Fetch the overall leaderboard for the weekly shorts season
+        const overallRecords = await fetchWeeklyShortSeasonLeaderboard(seasonUid, countryCode, 5);
+
+        if (overallRecords.length === 0) {
+            return await interaction.editReply(
+                t.responses.weeklyshortsleaderboard?.noSeasonRecords ||
+                `No ${getCountryName(countryCode)} players found in the current weekly shorts.`
+            );
+        }
+
+        // Get player names
+        const accountIds = overallRecords.map(r => r.accountId);
+        const playerNames = await fetchPlayerNames(accountIds);
+
+        // Create and send embed
+        const embed = createWeeklyShortSeasonLeaderboardEmbed(
+            campaign.name,
+            countryCode,
+            overallRecords,
+            playerNames,
+            t
+        );
+
+        await interaction.editReply({ embeds: [embed] });
+    } catch (error) {
+        throw error;
+    }
+}
+
+/**
+ * Shows the leaderboard for a specific weekly short map
+ * @param {Interaction} interaction - Discord interaction object
+ * @param {string} mapName - Map name to search for
+ * @param {string} countryCode - Country code to filter by
+ * @param {Object} t - Translation strings
+ */
+async function showWeeklyShortMapLeaderboard(interaction, mapName, countryCode, t) {
+    try {
+        const campaign = await fetchCurrentWeeklyShort();
+        const mapUids = campaign.playlist.map(m => m.mapUid);
+
+        const db = await getDb();
+        const dbMaps = await db.all(
+            'SELECT map_uid, name, thumbnail_url FROM weekly_short_maps WHERE season_uid = ?',
+            campaign.seasonUid
+        );
+
+        let matchingMap = dbMaps.find(map =>
+            map.name.toLowerCase().includes(mapName.toLowerCase())
+        );
+
+        if (!matchingMap) {
+            const mapList = await fetchMapInfo(mapUids);
+            const apiMap = mapList.find(map =>
+                map.name.toLowerCase().includes(mapName.toLowerCase())
+            );
+            
+            if (apiMap) {
+                matchingMap = {
+                    map_uid: apiMap.uid,
+                    name: apiMap.name,
+                    thumbnail_url: apiMap.thumbnailUrl
+                };
+            }
+        }
+
+        if (!matchingMap) {
+            return await interaction.editReply(
+                formatString(t.responses.weeklyshortsleaderboard?.noRecordsMap ||
+                    'No weekly shorts map found matching "{mapName}".',
+                    { mapName }
+                )
+            );
+        }
+
+        const mapRecords = await fetchWeeklyShortCountryLeaderboard(
+            matchingMap.map_uid,
+            campaign.seasonUid,
+            countryCode,
+            5
+        );
+
+        if (mapRecords.length === 0) {
+            return await interaction.editReply(
+                formatString(t.responses.weeklyshortsleaderboard?.noCountryRecords ||
+                    'No records found for {country} in {mapName}.',
+                    { country: getCountryName(countryCode), mapName: matchingMap.name }
+                )
+            );
+        }
+
+        const accountIds = mapRecords.map(r => r.accountId);
+        const playerNames = await fetchPlayerNames(accountIds);
+
+        const embed = createWeeklyShortMapLeaderboardEmbed(
+            matchingMap.name,
+            matchingMap.map_uid,
+            matchingMap.thumbnail_url,
+            countryCode,
+            mapRecords,
+            playerNames,
+            t
+        );
+
+        await interaction.editReply({ embeds: [embed] });
+    } catch (error) {
+        throw error;
+    }
+}
 
 /**
  * Initializes and configures the Discord bot client with all necessary event handlers
@@ -526,6 +779,13 @@ export function initBot() {
             }, 'scheduled record check');
         });
 
+        scheduleTask('checkWeeklyShorts', WEEKLY_SHORTS_CHECK_INTERVAL, async () => {
+            recordCheckQueue.enqueue(async () => {
+                const maxPosition = process.env.WEEKLY_SHORTS_MAX_POSITION || 10000;
+                await import('./weeklyShorts.js').then(module => module.checkWeeklyShorts(client, maxPosition));
+            }, 'scheduled weekly shorts check');
+        });
+
         setTimeout(async () => {
             recordCheckQueue.enqueue(async () => {
                 await import('./recordTracker.js').then(module => module.checkRecords(client));
@@ -533,6 +793,15 @@ export function initBot() {
                 log(`Error queuing initial record check: ${error.message}`, 'error');
             });
         }, INITIAL_RECORD_CHECK_DELAY);
+
+        setTimeout(async () => {
+            recordCheckQueue.enqueue(async () => {
+                const maxPosition = process.env.WEEKLY_SHORTS_MAX_POSITION || 10000;
+                await import('./weeklyShorts.js').then(module => module.checkWeeklyShorts(client, maxPosition));
+            }, 'initial weekly shorts check').catch((error) => {
+                log(`Error queuing initial weekly shorts check: ${error.message}`, 'error');
+            });
+        }, INITIAL_RECORD_CHECK_DELAY + 5000);
     });
 
     client.on('error', error => {

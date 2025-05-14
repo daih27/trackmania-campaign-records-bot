@@ -105,3 +105,34 @@ export async function setAnnouncementChannel(guildId, channelId) {
         return false;
     }
 }
+
+/**
+ * Set the weekly shorts announcement channel for a guild
+ * @param {string} guildId - Discord guild ID
+ * @param {string} channelId - Discord channel ID
+ * @returns {Promise<boolean>} - Success status
+ */
+export async function setWeeklyShortsAnnouncementChannel(guildId, channelId) {
+    try {
+        const db = await getDb();
+        
+        const guild = await db.get('SELECT id FROM guild_settings WHERE guild_id = ?', guildId);
+        
+        if (guild) {
+            await db.run(
+                'UPDATE guild_settings SET weekly_shorts_channel_id = ?, updated_at = CURRENT_TIMESTAMP WHERE guild_id = ?',
+                [channelId, guildId]
+            );
+        } else {
+            await db.run(
+                'INSERT INTO guild_settings (guild_id, weekly_shorts_channel_id) VALUES (?, ?)',
+                [guildId, channelId]
+            );
+        }
+        
+        return true;
+    } catch (error) {
+        log(`Error setting weekly shorts announcement channel: ${error.message}`, 'error');
+        return false;
+    }
+}

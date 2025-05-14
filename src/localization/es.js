@@ -17,7 +17,12 @@ export default {
         setcountryOption: 'País a usar como predeterminado',
         leaderboardCountryOption: 'Seleccionar un país para la tabla de clasificación',
         setchannel: 'Establecer el canal para los anuncios de récords',
-        setchannelOption: 'El canal donde se enviarán los anuncios de récords'
+        setchannelOption: 'El canal donde se enviarán los anuncios de récords',
+        setweeklyshortschannel: 'Establecer el canal para anuncios de weekly shorts',
+        setweeklyshortschannelOption: 'El canal donde se enviarán los anuncios de weekly shorts',
+        weeklyshortsleaderboard: 'Mostrar la tabla de clasificación de weekly shorts',
+        weeklyshortsleaderboardOption: 'Opcional: filtrar por nombre de mapa',
+        weeklyshortsleaderboardCountryOption: 'Seleccionar un país'
     },
 
     // Command responses
@@ -61,6 +66,18 @@ export default {
             changed: '✅ Los anuncios de récords ahora se enviarán a {channel}',
             error: '❌ No se pudo establecer el canal de anuncios.',
             notText: '❌ El canal seleccionado debe ser un canal de texto.'
+        },
+        setweeklyshortschannel: {
+            noPermission: '❌ Necesitas permisos de administrador o moderador para usar este comando.',
+            changed: '✅ Los anuncios de weekly shorts ahora se enviarán a {channel}',
+            error: '❌ No se pudo establecer el canal de anuncios de weekly shorts.',
+            notText: '❌ El canal seleccionado debe ser un canal de texto.'
+        },
+        weeklyshortsleaderboard: {
+            error: '❌ Ocurrió un error al obtener la tabla de clasificación de weekly shorts.',
+            noSeasonRecords: 'No se encontraron jugadores de {country} en los weekly shorts actuales.',
+            noRecordsMap: 'No se encontró ningún mapa de weekly shorts que coincida con "{mapName}".',
+            noCountryRecords: 'No se encontraron récords de {country} en {mapName}.'
         },
         error: {
             unknown: 'Ocurrió un error al procesar este comando.',
@@ -113,6 +130,10 @@ export default {
             setcountryDesc: 'Establecer el país predeterminado para la tabla de clasificación (solo admin/mod)',
             setchannel: '📣 /setchannel',
             setchannelDesc: 'Establecer el canal para los anuncios de récords (solo admin/mod)',
+            weeklyshortsleaderboard: '🏆 /weeklyshortsleaderboard',
+            weeklyshortsleaderboardDesc: 'Mostrar la tabla de clasificación de weekly shorts (general o por mapa)',
+            setweeklyshortschannel: '📢 /setweeklyshortschannel',
+            setweeklyshortschannelDesc: 'Establecer el canal para anuncios de weekly shorts (solo admin/mod)',
             footer: 'Los récords se verifican automáticamente'
         },
         newRecord: {

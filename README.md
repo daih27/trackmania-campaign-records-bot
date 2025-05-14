@@ -5,7 +5,9 @@ A Discord bot that tracks and announces Trackmania player records for campaign m
 ## Features
 
 - Track player records on official Trackmania campaign maps
+- Track weekly shorts personal bests
 - Automatic Discord announcements for new records and improvements
+- Automatic announcements for weekly shorts personal bests
 - Multi-language support (English and Spanish for now)
 - Leaderboard commands with country filtering
 - Expandable to more languages and countries if needed
@@ -64,9 +66,11 @@ npm start
 - `/unregister` - Unlink your account
 - `/records` - View your recent records
 - `/leaderboard [map] [country]` - View campaign or map leaderboards
+- `/weeklyshortsleaderboard [map] [country]` - View weekly shorts leaderboard (overall or specific map)
 - `/setcountry <country>` - Set default country for leaderboards (Admin/Mod only)
 - `/language <lang>` - Change bot language (Admin/Mod only)
-- `/setchannel <channel>` - Set announcement channel (Admin/Mod only)
+- `/setchannel <channel>` - Set announcement channel for records (Admin/Mod only)
+- `/setweeklyshortschannel <channel>` - Set announcement channel for weekly shorts (Admin/Mod only)
 - `/help` - Show all available commands
 
 ## Acknowledgments

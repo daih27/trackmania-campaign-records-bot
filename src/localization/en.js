@@ -17,7 +17,12 @@ export default {
         setcountryOption: 'Country to use as default',
         leaderboardCountryOption: 'Select a country for the leaderboard',
         setchannel: 'Set the channel for record announcements',
-        setchannelOption: 'The channel to send record announcements to'
+        setchannelOption: 'The channel to send record announcements to',
+        setweeklyshortschannel: 'Set the channel for weekly shorts announcements',
+        setweeklyshortschannelOption: 'The channel to send weekly shorts announcements to',
+        weeklyshortsleaderboard: 'Show weekly shorts leaderboard',
+        weeklyshortsleaderboardOption: 'Optional: filter by map name',
+        weeklyshortsleaderboardCountryOption: 'Select a country'
     },
 
     // Command responses
@@ -61,6 +66,18 @@ export default {
             changed: '✅ Record announcements will now be sent to {channel}',
             error: '❌ Failed to set the announcement channel.',
             notText: '❌ The selected channel must be a text channel.'
+        },
+        setweeklyshortschannel: {
+            noPermission: '❌ You need administrator or moderator permissions to use this command.',
+            changed: '✅ Weekly shorts announcements will now be sent to {channel}',
+            error: '❌ Failed to set the weekly shorts announcement channel.',
+            notText: '❌ The selected channel must be a text channel.'
+        },
+        weeklyshortsleaderboard: {
+            error: '❌ An error occurred while fetching the weekly shorts leaderboard.',
+            noSeasonRecords: 'No {country} players found in the current weekly shorts.',
+            noRecordsMap: 'No weekly shorts map found matching "{mapName}".',
+            noCountryRecords: 'No records found for {country} in {mapName}.'
         },
         error: {
             unknown: 'An error occurred while processing this command.',
@@ -113,6 +130,10 @@ export default {
             setcountryDesc: 'Set the default country for leaderboard (admin/mod only)',
             setchannel: '📣 /setchannel',
             setchannelDesc: 'Set the channel for record announcements (admin/mod only)',
+            weeklyshortsleaderboard: '🏆 /weeklyshortsleaderboard',
+            weeklyshortsleaderboardDesc: 'Show weekly shorts leaderboard (overall or by map)',
+            setweeklyshortschannel: '📢 /setweeklyshortschannel',
+            setweeklyshortschannelDesc: 'Set the channel for weekly shorts announcements (admin/mod only)',
             footer: 'Records are checked automatically'
         },
         newRecord: {

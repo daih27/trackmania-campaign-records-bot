@@ -9,6 +9,9 @@ dotenv.config();
 // How often to check for new records
 export const RECORD_CHECK_INTERVAL = 15 * 60 * 1000;
 
+// How often to check for weekly shorts positions
+export const WEEKLY_SHORTS_CHECK_INTERVAL = 18 * 60 * 1000;
+
 // How long to wait after bot startup before performing the first record check (default: 5 seconds)
 export const INITIAL_RECORD_CHECK_DELAY = 5000;
 
