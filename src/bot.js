@@ -7,7 +7,7 @@ import { getDisplayNames } from './oauth.js';
 import { formatTime, log } from './utils.js';
 import { getDb } from './db.js';
 import { getTranslations, setLanguage, getAvailableLanguages, formatString } from './localization/index.js';
-import { setDefaultCountry, getAvailableCountries, setAnnouncementChannel, setWeeklyShortsAnnouncementChannel } from './guildSettings.js';
+import { setDefaultCountry, getAvailableCountries, setAnnouncementChannel, setWeeklyShortsAnnouncementChannel, setMinWorldPosition } from './guildSettings.js';
 import { REGIONS, getCountryName } from './config/regions.js';
 import { getDefaultCountry } from './guildSettings.js';
 import {
@@ -129,6 +129,16 @@ function getCommands(t) {
                 option.setName('channel')
                     .setDescription(t.commands.setweeklyshortschannelOption || 'The channel to send weekly shorts announcements to')
                     .setRequired(true)),
+
+        new SlashCommandBuilder()
+            .setName('setminposition')
+            .setDescription(t.commands.setminposition || 'Set the minimum world position to announce records')
+            .addIntegerOption(option =>
+                option.setName('position')
+                    .setDescription(t.commands.setminpositionOption || 'Minimum world position (e.g. 5000)')
+                    .setRequired(true)
+                    .setMinValue(1)
+                    .setMaxValue(100000)),
     ].map(command => command.toJSON());
 }
 
@@ -354,6 +364,10 @@ async function handleHelp(interaction) {
                 value: t.embeds.help.setweeklyshortschannelDesc || 'Set the channel for weekly shorts announcements (Admin/Mod only)'
             },
             {
+                name: t.embeds.help.setminposition || '/setminposition',
+                value: t.embeds.help.setminpositionDesc || 'Set minimum world position to announce records (Admin/Mod only)'
+            },
+            {
                 name: t.embeds.help.updateDisplayNames || '/update-display-names',
                 value: t.embeds.help.updateDisplayNamesDesc || 'Update all player display names from Trackmania API (Admin only)'
             }
@@ -408,6 +422,9 @@ async function handleInteraction(interaction) {
                     break;
                 case 'weeklyshortsleaderboard':
                     await handleWeeklyShortsLeaderboard(interaction);
+                    break;
+                case 'setminposition':
+                    await handleSetMinPosition(interaction);
                     break;
                 default:
                     await interaction.reply(t.responses.error.unknownCommand);
@@ -598,6 +615,53 @@ async function handleSetWeeklyShortsChannel(interaction) {
     }
 }
 
+/**
+ * Handles the /setminposition command to set the minimum world position threshold
+ * Admin/Moderator-only command
+ * @param {Interaction} interaction - Discord interaction object
+ */
+async function handleSetMinPosition(interaction) {
+    const t = await getTranslations(interaction.guildId);
+
+    if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator) &&
+        !interaction.member.permissions.has(PermissionFlagsBits.ModerateMembers)) {
+        return await interaction.reply({
+            content: t.responses.setminposition?.noPermission ||
+                'You need administrator or moderator permissions to use this command.',
+            ephemeral: true
+        });
+    }
+
+    try {
+        await interaction.deferReply();
+        const position = interaction.options.getInteger('position');
+        const guildId = interaction.guildId;
+
+        const result = await setMinWorldPosition(guildId, position);
+
+        if (!result) {
+            return await interaction.editReply(
+                t.responses.setminposition?.error ||
+                '❌ Failed to set the minimum world position.'
+            );
+        }
+
+        await interaction.editReply(
+            formatString(
+                t.responses.setminposition?.changed ||
+                '✅ Records will now only be announced for world positions within the top {position}',
+                { position: position.toLocaleString() }
+            )
+        );
+    } catch (error) {
+        log(`Error in setminposition command: ${error.message}`, 'error');
+        await interaction.editReply(
+            t.responses.setminposition?.error ||
+            '❌ An error occurred while setting the minimum world position.'
+        );
+    }
+}
+
 import handleLeaderboardModule from './handleLeaderboard.js';
 
 /**
@@ -614,10 +678,8 @@ async function handleWeeklyShortsLeaderboard(interaction) {
         const countryCode = interaction.options.getString('country') || await getDefaultCountry(interaction.guildId);
 
         if (mapName) {
-            // Show leaderboard for a specific map
             await showWeeklyShortMapLeaderboard(interaction, mapName, countryCode, t);
         } else {
-            // Show overall weekly shorts standings
             await showWeeklyShortOverallLeaderboard(interaction, countryCode, t);
         }
     } catch (error) {
@@ -639,8 +701,6 @@ async function showWeeklyShortOverallLeaderboard(interaction, countryCode, t) {
     try {
         const campaign = await fetchCurrentWeeklyShort();
         const seasonUid = campaign.seasonUid;
-
-        // Fetch the overall leaderboard for the weekly shorts season
         const overallRecords = await fetchWeeklyShortSeasonLeaderboard(seasonUid, countryCode, 5);
 
         if (overallRecords.length === 0) {
@@ -650,11 +710,9 @@ async function showWeeklyShortOverallLeaderboard(interaction, countryCode, t) {
             );
         }
 
-        // Get player names
         const accountIds = overallRecords.map(r => r.accountId);
         const playerNames = await fetchPlayerNames(accountIds);
 
-        // Create and send embed
         const embed = createWeeklyShortSeasonLeaderboardEmbed(
             campaign.name,
             countryCode,

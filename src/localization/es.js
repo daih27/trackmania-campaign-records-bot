@@ -22,7 +22,9 @@ export default {
         setweeklyshortschannelOption: 'El canal donde se enviarán los anuncios de weekly shorts',
         weeklyshortsleaderboard: 'Mostrar la tabla de clasificación de weekly shorts',
         weeklyshortsleaderboardOption: 'Opcional: filtrar por nombre de mapa',
-        weeklyshortsleaderboardCountryOption: 'Seleccionar un país'
+        weeklyshortsleaderboardCountryOption: 'Seleccionar un país',
+        setminposition: 'Establecer la posición mundial mínima para anunciar récords',
+        setminpositionOption: 'Posición mundial mínima (ej. 5000)'
     },
 
     // Command responses
@@ -79,6 +81,11 @@ export default {
             noRecordsMap: 'No se encontró ningún mapa de weekly shorts que coincida con "{mapName}".',
             noCountryRecords: 'No se encontraron récords de {country} en {mapName}.'
         },
+        setminposition: {
+            noPermission: '❌ Necesitas permisos de administrador o moderador para usar este comando.',
+            changed: '✅ Los récords ahora solo se anunciarán para posiciones mundiales dentro del top {position}',
+            error: '❌ No se pudo establecer la posición mundial mínima.'
+        },
         error: {
             unknown: 'Ocurrió un error al procesar este comando.',
             unknownCommand: 'Comando desconocido.'
@@ -134,6 +141,8 @@ export default {
             weeklyshortsleaderboardDesc: 'Mostrar la tabla de clasificación de weekly shorts (general o por mapa)',
             setweeklyshortschannel: '📢 /setweeklyshortschannel',
             setweeklyshortschannelDesc: 'Establecer el canal para anuncios de weekly shorts (solo admin/mod)',
+            setminposition: '🎯 /setminposition',
+            setminpositionDesc: 'Establecer posición mundial mínima para anunciar récords (solo admin/mod)',
             footer: 'Los récords se verifican automáticamente'
         },
         newRecord: {

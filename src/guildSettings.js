@@ -136,3 +136,65 @@ export async function setWeeklyShortsAnnouncementChannel(guildId, channelId) {
         return false;
     }
 }
+
+/**
+ * Get the minimum world position threshold for a guild
+ * @param {string} guildId - Discord guild ID
+ * @returns {Promise<number>} - Minimum world position threshold (default: 5000)
+ */
+export async function getMinWorldPosition(guildId) {
+    try {
+        const db = await getDb();
+        
+        let guild = await db.get('SELECT min_world_position FROM guild_settings WHERE guild_id = ?', guildId);
+        
+        if (!guild) {
+            await db.run(
+                'INSERT INTO guild_settings (guild_id, min_world_position) VALUES (?, ?)',
+                [guildId, 5000]
+            );
+            return 5000;
+        }
+        
+        return guild.min_world_position || 5000;
+    } catch (error) {
+        log(`Error getting minimum world position: ${error.message}`, 'error');
+        return 5000;
+    }
+}
+
+/**
+ * Set the minimum world position threshold for a guild
+ * @param {string} guildId - Discord guild ID
+ * @param {number} position - Minimum world position threshold
+ * @returns {Promise<boolean>} - Success status
+ */
+export async function setMinWorldPosition(guildId, position) {
+    try {
+        if (position < 1 || position > 100000) {
+            log(`Invalid position: ${position}`, 'warn');
+            return false;
+        }
+        
+        const db = await getDb();
+        
+        const guild = await db.get('SELECT id FROM guild_settings WHERE guild_id = ?', guildId);
+        
+        if (guild) {
+            await db.run(
+                'UPDATE guild_settings SET min_world_position = ?, updated_at = CURRENT_TIMESTAMP WHERE guild_id = ?',
+                [position, guildId]
+            );
+        } else {
+            await db.run(
+                'INSERT INTO guild_settings (guild_id, min_world_position) VALUES (?, ?)',
+                [guildId, position]
+            );
+        }
+        
+        return true;
+    } catch (error) {
+        log(`Error setting minimum world position: ${error.message}`, 'error');
+        return false;
+    }
+}

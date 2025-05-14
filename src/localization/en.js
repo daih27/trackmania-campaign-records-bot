@@ -22,7 +22,9 @@ export default {
         setweeklyshortschannelOption: 'The channel to send weekly shorts announcements to',
         weeklyshortsleaderboard: 'Show weekly shorts leaderboard',
         weeklyshortsleaderboardOption: 'Optional: filter by map name',
-        weeklyshortsleaderboardCountryOption: 'Select a country'
+        weeklyshortsleaderboardCountryOption: 'Select a country',
+        setminposition: 'Set the minimum world position to announce records',
+        setminpositionOption: 'Minimum world position (e.g. 5000)'
     },
 
     // Command responses
@@ -79,6 +81,11 @@ export default {
             noRecordsMap: 'No weekly shorts map found matching "{mapName}".',
             noCountryRecords: 'No records found for {country} in {mapName}.'
         },
+        setminposition: {
+            noPermission: '❌ You need administrator or moderator permissions to use this command.',
+            changed: '✅ Records will now only be announced for world positions within the top {position}',
+            error: '❌ Failed to set the minimum world position.'
+        },
         error: {
             unknown: 'An error occurred while processing this command.',
             unknownCommand: 'Unknown command.'
@@ -134,6 +141,8 @@ export default {
             weeklyshortsleaderboardDesc: 'Show weekly shorts leaderboard (overall or by map)',
             setweeklyshortschannel: '📢 /setweeklyshortschannel',
             setweeklyshortschannelDesc: 'Set the channel for weekly shorts announcements (admin/mod only)',
+            setminposition: '🎯 /setminposition',
+            setminpositionDesc: 'Set minimum world position to announce records (admin/mod only)',
             footer: 'Records are checked automatically'
         },
         newRecord: {

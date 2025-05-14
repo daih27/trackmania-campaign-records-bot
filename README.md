@@ -71,6 +71,7 @@ npm start
 - `/language <lang>` - Change bot language (Admin/Mod only)
 - `/setchannel <channel>` - Set announcement channel for records (Admin/Mod only)
 - `/setweeklyshortschannel <channel>` - Set announcement channel for weekly shorts (Admin/Mod only)
+- `/setminposition <position>` - Set minimum world position to announce records (Admin/Mod only)
 - `/help` - Show all available commands
 
 ## Acknowledgments

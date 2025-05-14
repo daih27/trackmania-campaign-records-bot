@@ -9,6 +9,7 @@ import { REGIONS, getCountryName } from './config/regions.js';
 import { getDisplayNamesBatch } from './oauth.js';
 import { tmOAuthClientId, tmOAuthClientSecret, TRACKMANIA_ICON_URL } from './config.js';
 import { fetchMapInfo } from './recordTracker.js';
+import { getMinWorldPosition } from './guildSettings.js';
 
 /**
  * Fetches leaderboard data for a weekly short season filtered by country
@@ -488,9 +489,9 @@ export function createWeeklyShortEmbed(record, t) {
 /**
  * Checks and updates weekly short positions for all tracked players
  * @param {Client} client - Discord.js client instance
- * @param {number} maxPosition - Maximum leaderboard position to scan (default: 10000)
+ * @param {number} defaultMaxPosition - Default maximum leaderboard position to scan (default: 10000)
  */
-export async function checkWeeklyShorts(client, maxPosition = 10000) {
+export async function checkWeeklyShorts(client, defaultMaxPosition = 10000) {
     const db = await getDb();
 
     try {
@@ -509,6 +510,22 @@ export async function checkWeeklyShorts(client, maxPosition = 10000) {
         log(`Fetching info for ${mapUids.length} weekly short maps`);
         const mapList = await fetchMapInfo(mapUids);
         const accountIds = players.map(p => p.account_id);
+        
+        const guilds = client.guilds.cache;
+        let lowestMinPosition = defaultMaxPosition;
+        
+        for (const [guildId] of guilds) {
+            try {
+                const minPosition = await getMinWorldPosition(guildId);
+                if (minPosition < lowestMinPosition) {
+                    lowestMinPosition = minPosition;
+                }
+            } catch (error) {
+                log(`Error getting min position for guild ${guildId}: ${error.message}`, 'warn');
+            }
+        }
+        
+        log(`Using minimum position threshold: ${lowestMinPosition} (from guild settings)`);
         
         for (let i = 0; i < mapList.length; i++) {
             const map = mapList[i];
@@ -569,8 +586,8 @@ export async function checkWeeklyShorts(client, maxPosition = 10000) {
                 continue;
             }
 
-            log(`Fetching positions for ${playersWithNewRecords.length} players with new records`);
-            const playerPositions = await getWeeklyShortPlayerPositions(mapUid, seasonUid, playersWithNewRecords, maxPosition);
+            log(`Fetching positions for ${playersWithNewRecords.length} players with new records (max position: ${lowestMinPosition})`);
+            const playerPositions = await getWeeklyShortPlayerPositions(mapUid, seasonUid, playersWithNewRecords, lowestMinPosition);
 
             for (const accountId of playersWithNewRecords) {
                 const player = players.find(p => p.account_id === accountId);
@@ -601,7 +618,7 @@ export async function checkWeeklyShorts(client, maxPosition = 10000) {
         if (err.response?.status === 401) {
             invalidateTokens();
             log('Refreshing Nadeo tokens and retrying...', 'warn');
-            await checkWeeklyShorts(client, maxPosition);
+            await checkWeeklyShorts(client, lowestMinPosition);
         }
     }
 }
@@ -735,6 +752,12 @@ async function announceWeeklyShortUpdates(client, db) {
                 }
 
                 if (!channel) continue;
+
+                const minPosition = await getMinWorldPosition(guildId);
+                if (record.position && record.position > minPosition) {
+                    log(`Weekly short position by ${record.username} (#${record.position}) does not meet minimum position (top ${minPosition}) for guild ${guildId}`);
+                    continue;
+                }
 
                 const t = await getTranslations(guildId);
                 const embed = createWeeklyShortEmbed(record, t);

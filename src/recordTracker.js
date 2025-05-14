@@ -8,6 +8,7 @@ import { EmbedBuilder } from 'discord.js';
 import { REGIONS, getCountryName } from './config/regions.js';
 import { getDisplayNamesBatch } from './oauth.js';
 import { tmOAuthClientId, tmOAuthClientSecret, TRACKMANIA_ICON_URL } from './config.js';
+import { getMinWorldPosition } from './guildSettings.js';
 
 
 /**
@@ -803,6 +804,12 @@ async function announceNewRecords(client, db) {
                     log(`World position for ${record.username} on ${record.map_name}: #${worldPosition}`);
                 } catch (positionError) {
                     log(`Failed to fetch world position: ${positionError.message}`, 'warn');
+                }
+
+                const minPosition = await getMinWorldPosition(guildId);
+                if (worldPosition && worldPosition > minPosition) {
+                    log(`Record by ${record.username} (#${worldPosition}) does not meet minimum position (top ${minPosition}) for guild ${guildId}`);
+                    continue;
                 }
 
                 const embed = createRecordEmbed(record, t, worldPosition);

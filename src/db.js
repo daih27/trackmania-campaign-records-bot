@@ -83,7 +83,8 @@ export async function initDatabase() {
       language TEXT DEFAULT 'en',
       records_channel_id TEXT,
       weekly_shorts_channel_id TEXT,
-      default_country TEXT DEFAULT 'CHI', 
+      default_country TEXT DEFAULT 'CHI',
+      min_world_position INTEGER DEFAULT 5000,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
