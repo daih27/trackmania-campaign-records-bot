@@ -5,6 +5,7 @@ import { log } from './utils.js';
 import { invalidateTokens } from './auth.js';
 import { getDefaultCountry } from './guildSettings.js';
 import { apiQueue } from './utils/taskQueue.js';
+import { getZoneName } from './config/zones.js';
 
 /**
  * Handles the /leaderboard command to display Trackmania leaderboards
@@ -72,7 +73,7 @@ async function handleLeaderboard(interaction) {
                 } catch (error) {
                 }
 
-                const embed = createCountryLeaderboardEmbed(
+                const embed = await createCountryLeaderboardEmbed(
                     map.name,
                     map.map_uid,
                     map.thumbnail_url,
@@ -86,7 +87,8 @@ async function handleLeaderboard(interaction) {
                 return;
             }
 
-            return await interaction.editReply(formatString(t.responses.leaderboard.noCountryRecords, { mapName: map.name || map.map_uid, country: countryCode }));
+            const countryName = await getZoneName(countryCode);
+            return await interaction.editReply(formatString(t.responses.leaderboard.noCountryRecords, { mapName: map.name || map.map_uid, country: countryName }));
 
         }
 
@@ -108,7 +110,7 @@ async function handleLeaderboard(interaction) {
                 } catch (error) {
                 }
 
-                const embed = createSeasonLeaderboardEmbed(
+                const embed = await createSeasonLeaderboardEmbed(
                     seasonName,
                     countryCode,
                     seasonRecords,
@@ -118,9 +120,10 @@ async function handleLeaderboard(interaction) {
 
                 await interaction.editReply({ content: null, embeds: [embed] });
             } else {
+                const countryName = await getZoneName(countryCode);
                 await interaction.editReply(formatString(
                     t.responses.leaderboard.noSeasonRecords || 'No {country} players found in the current season leaderboard.',
-                    { country: countryCode }
+                    { country: countryName }
                 ));
             }
         } catch (error) {

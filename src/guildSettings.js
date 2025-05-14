@@ -1,80 +1,71 @@
 import { getDb } from './db.js';
 import { log } from './utils.js';
-import { REGIONS, COUNTRY_NAMES, getCountryName } from './config/regions.js';
+import { getAvailableCountries } from './config/zones.js';
 
 /**
- * Get the default country for a guild
+ * Get the default zone ID for a guild
  * @param {string} guildId - Discord guild ID
- * @returns {Promise<string>} - Default country code for the guild (e.g., 'CHI')
+ * @returns {Promise<string>} - Default zone ID for the guild
  */
 export async function getDefaultCountry(guildId) {
     try {
         const db = await getDb();
-        
-        let guild = await db.get('SELECT default_country FROM guild_settings WHERE guild_id = ?', guildId);
-        
+
+        let guild = await db.get('SELECT default_zone_id as default_zone_id FROM guild_settings WHERE guild_id = ?', guildId);
+
         if (!guild) {
             await db.run(
-                'INSERT INTO guild_settings (guild_id, default_country) VALUES (?, ?)',
-                [guildId, 'CHI']
+                'INSERT INTO guild_settings (guild_id, default_zone_id) VALUES (?, ?)',
+                [guildId, '301e7e43-7e13-11e8-8060-e284abfd2bc4']
             );
-            return 'CHI';
+            return '301e7e43-7e13-11e8-8060-e284abfd2bc4';
         }
-        
-        return guild.default_country || 'CHI';
+
+        return guild.default_zone_id || '301e7e43-7e13-11e8-8060-e284abfd2bc4';
     } catch (error) {
         log(`Error getting default country: ${error.message}`, 'error');
-        return 'CHI';
+        return '301e7e43-7e13-11e8-8060-e284abfd2bc4';
     }
 }
 
 /**
- * Set the default country for a guild
+ * Set the default zone ID for a guild
  * @param {string} guildId - Discord guild ID
- * @param {string} countryCode - Country code to set as default (e.g., 'CHI')
+ * @param {string} zoneId - Zone ID to set as default
  * @returns {Promise<boolean>} - Success status
  */
-export async function setDefaultCountry(guildId, countryCode) {
+export async function setDefaultCountry(guildId, zoneId) {
     try {
-        if (!REGIONS[countryCode]) {
-            log(`Invalid country code: ${countryCode}`, 'warn');
+        const countries = await getAvailableCountries();
+        const validCountry = countries.find(c => c.value === zoneId);
+        if (!validCountry) {
+            log(`Invalid zone ID: ${zoneId}`, 'warn');
             return false;
         }
-        
+
         const db = await getDb();
-        
+
         const guild = await db.get('SELECT id FROM guild_settings WHERE guild_id = ?', guildId);
-        
+
         if (guild) {
+
             await db.run(
-                'UPDATE guild_settings SET default_country = ?, updated_at = CURRENT_TIMESTAMP WHERE guild_id = ?',
-                [countryCode, guildId]
+                'UPDATE guild_settings SET default_zone_id = ?, updated_at = CURRENT_TIMESTAMP WHERE guild_id = ?',
+                [zoneId, guildId]
             );
         } else {
             await db.run(
                 'INSERT INTO guild_settings (guild_id, default_country) VALUES (?, ?)',
-                [guildId, countryCode]
+                [guildId, zoneId]
             );
         }
-        
+
         return true;
     } catch (error) {
         log(`Error setting default country: ${error.message}`, 'error');
         return false;
     }
 }
-
-/**
- * Get a list of available countries
- * @returns {Array<{name: string, value: string}>} - Array of country choices for dropdown
- */
-export function getAvailableCountries() {
-    return Object.keys(REGIONS).map(code => ({
-        name: getCountryName(code),
-        value: code
-    }));
-}
-
 /**
  * Set the announcement channel for a guild
  * @param {string} guildId - Discord guild ID
@@ -84,9 +75,9 @@ export function getAvailableCountries() {
 export async function setAnnouncementChannel(guildId, channelId) {
     try {
         const db = await getDb();
-        
+
         const guild = await db.get('SELECT id FROM guild_settings WHERE guild_id = ?', guildId);
-        
+
         if (guild) {
             await db.run(
                 'UPDATE guild_settings SET records_channel_id = ?, updated_at = CURRENT_TIMESTAMP WHERE guild_id = ?',
@@ -98,7 +89,7 @@ export async function setAnnouncementChannel(guildId, channelId) {
                 [guildId, channelId]
             );
         }
-        
+
         return true;
     } catch (error) {
         log(`Error setting announcement channel: ${error.message}`, 'error');
@@ -115,9 +106,9 @@ export async function setAnnouncementChannel(guildId, channelId) {
 export async function setWeeklyShortsAnnouncementChannel(guildId, channelId) {
     try {
         const db = await getDb();
-        
+
         const guild = await db.get('SELECT id FROM guild_settings WHERE guild_id = ?', guildId);
-        
+
         if (guild) {
             await db.run(
                 'UPDATE guild_settings SET weekly_shorts_channel_id = ?, updated_at = CURRENT_TIMESTAMP WHERE guild_id = ?',
@@ -129,7 +120,7 @@ export async function setWeeklyShortsAnnouncementChannel(guildId, channelId) {
                 [guildId, channelId]
             );
         }
-        
+
         return true;
     } catch (error) {
         log(`Error setting weekly shorts announcement channel: ${error.message}`, 'error');
@@ -145,9 +136,9 @@ export async function setWeeklyShortsAnnouncementChannel(guildId, channelId) {
 export async function getMinWorldPosition(guildId) {
     try {
         const db = await getDb();
-        
+
         let guild = await db.get('SELECT min_world_position FROM guild_settings WHERE guild_id = ?', guildId);
-        
+
         if (!guild) {
             await db.run(
                 'INSERT INTO guild_settings (guild_id, min_world_position) VALUES (?, ?)',
@@ -155,7 +146,7 @@ export async function getMinWorldPosition(guildId) {
             );
             return 5000;
         }
-        
+
         return guild.min_world_position || 5000;
     } catch (error) {
         log(`Error getting minimum world position: ${error.message}`, 'error');
@@ -175,11 +166,11 @@ export async function setMinWorldPosition(guildId, position) {
             log(`Invalid position: ${position}`, 'warn');
             return false;
         }
-        
+
         const db = await getDb();
-        
+
         const guild = await db.get('SELECT id FROM guild_settings WHERE guild_id = ?', guildId);
-        
+
         if (guild) {
             await db.run(
                 'UPDATE guild_settings SET min_world_position = ?, updated_at = CURRENT_TIMESTAMP WHERE guild_id = ?',
@@ -191,7 +182,7 @@ export async function setMinWorldPosition(guildId, position) {
                 [guildId, position]
             );
         }
-        
+
         return true;
     } catch (error) {
         log(`Error setting minimum world position: ${error.message}`, 'error');

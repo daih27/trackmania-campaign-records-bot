@@ -5,7 +5,7 @@ import { getDb } from './db.js';
 import { getPlayers } from './playerManager.js';
 import { getTranslations, formatString } from './localization/index.js';
 import { EmbedBuilder } from 'discord.js';
-import { REGIONS, getCountryName } from './config/regions.js';
+import { getZoneName, getZoneNamesForCountry } from './config/zones.js';
 import { getDisplayNamesBatch } from './oauth.js';
 import { tmOAuthClientId, tmOAuthClientSecret, TRACKMANIA_ICON_URL } from './config.js';
 import { getMinWorldPosition } from './guildSettings.js';
@@ -14,14 +14,14 @@ import { getMinWorldPosition } from './guildSettings.js';
 /**
  * Creates a Discord embed for displaying season/campaign leaderboard data
  * @param {string} seasonName - The season/campaign name
- * @param {string} countryCode - The country code (e.g., 'CHI')
+ * @param {string} countryCode - The country zone ID
  * @param {Array} records - The leaderboard records
  * @param {Object} playerNames - Mapping of account IDs to display names
  * @param {Object} t - Translation strings
- * @returns {EmbedBuilder} Discord embed for the season leaderboard
+ * @returns {Promise<EmbedBuilder>} Discord embed for the season leaderboard
  */
-export function createSeasonLeaderboardEmbed(seasonName, countryCode = 'CHI', records, playerNames, t) {
-    const countryName = getCountryName(countryCode);
+export async function createSeasonLeaderboardEmbed(seasonName, countryCode, records, playerNames, t) {
+    const countryName = await getZoneName(countryCode);
     const embed = new EmbedBuilder()
         .setTitle(formatString(t.embeds.seasonLeaderboard?.title || '🏆 {country} Season Leaderboard: {season}', {
             country: countryName,
@@ -67,20 +67,22 @@ export function createSeasonLeaderboardEmbed(seasonName, countryCode = 'CHI', re
 /**
  * Fetches leaderboard data for a specific season/campaign filtered by country
  * @param {string} seasonUid - The season/campaign UID
- * @param {string} countryCode - The country code (e.g., 'CHI')
+ * @param {string} countryCode - The country zone ID
  * @param {number} limit - Number of records to retrieve
  * @returns {Promise<Array>} Array of leaderboard records for the specified country
  */
-export async function fetchSeasonLeaderboard(seasonUid, countryCode = 'CHI', limit = 5) {
+export async function fetchSeasonLeaderboard(seasonUid, countryCode, limit = 5) {
     const liveToken = await ensureToken('NadeoLiveServices');
 
-    const regions = REGIONS[countryCode] || [];
-    if (regions.length === 0) {
-        log(`No regions found for country code: ${countryCode} (${getCountryName(countryCode)})`, 'warn');
+    const zoneNames = await getZoneNamesForCountry(countryCode);
+    if (zoneNames.size === 0) {
+        const countryName = await getZoneName(countryCode);
+        log(`No zones found for country code: ${countryCode} (${countryName})`, 'warn');
         return [];
     }
 
-    log(`Fetching season leaderboard for ${getCountryName(countryCode)}`);
+    const countryName = await getZoneName(countryCode);
+    log(`Fetching season leaderboard for ${countryName} (zones: ${Array.from(zoneNames).join(', ')})`);
 
     let countryRecords = [];
     let offset = 0;
@@ -99,7 +101,7 @@ export async function fetchSeasonLeaderboard(seasonUid, countryCode = 'CHI', lim
 
         const worldTop = leaderboardRes.data.tops[0].top;
         const batchCountryRecords = worldTop.filter(record =>
-            regions.includes(record.zoneName));
+            zoneNames.has(record.zoneName));
 
         countryRecords.push(...batchCountryRecords);
         offset += 100;
@@ -109,7 +111,7 @@ export async function fetchSeasonLeaderboard(seasonUid, countryCode = 'CHI', lim
         .sort((a, b) => a.position - b.position)
         .slice(0, limit);
 
-    log(`Found ${result.length} ${getCountryName(countryCode)} players in season leaderboard`);
+    log(`Found ${result.length} ${countryName} players in season leaderboard`);
     return result;
 }
 
@@ -229,20 +231,22 @@ export async function fetchPlayerRecords(mapId, accountIds) {
 /**
  * Fetch map leaderboard for a specific country
  * @param {string} mapUid The map UID
- * @param {string} countryCode The country code (e.g., 'CHI')
+ * @param {string} countryCode The country zone ID
  * @param {number} length Number of records to retrieve
  * @returns {Promise<Array>} Leaderboard for the specified country
  */
-export async function fetchCountryLeaderboard(mapUid, countryCode = 'CHI', length = 5) {
+export async function fetchCountryLeaderboard(mapUid, countryCode, length = 5) {
     const liveToken = await ensureToken('NadeoLiveServices');
 
-    const regions = REGIONS[countryCode] || [];
-    if (regions.length === 0) {
-        log(`No regions found for country code: ${countryCode} (${getCountryName(countryCode)})`, 'warn');
+    const zoneNames = await getZoneNamesForCountry(countryCode);
+    if (zoneNames.size === 0) {
+        const countryName = await getZoneName(countryCode);
+        log(`No zones found for country code: ${countryCode} (${countryName})`, 'warn');
         return [];
     }
 
-    log(`Searching for ${getCountryName(countryCode)} players (regions: ${regions.join(', ')})`);
+    const countryName = await getZoneName(countryCode);
+    log(`Searching for ${countryName} players (zones: ${Array.from(zoneNames).join(', ')})`);
 
     let countryRecords = [];
     let offset = 0;
@@ -261,7 +265,7 @@ export async function fetchCountryLeaderboard(mapUid, countryCode = 'CHI', lengt
 
         const worldTop = leaderboardRes.data.tops[0].top;
         const batchCountryRecords = worldTop.filter(record =>
-            regions.includes(record.zoneName));
+            zoneNames.has(record.zoneName));
 
         countryRecords.push(...batchCountryRecords);
         offset += 100;
@@ -271,7 +275,7 @@ export async function fetchCountryLeaderboard(mapUid, countryCode = 'CHI', lengt
         .sort((a, b) => a.position - b.position)
         .slice(0, length);
 
-    log(`Found ${result.length} ${getCountryName(countryCode)} players out of ${countryRecords.length} total after searching`);
+    log(`Found ${result.length} ${countryName} players out of ${countryRecords.length} total after searching`);
     return result;
 }
 
@@ -689,14 +693,14 @@ export function createRecordEmbed(record, t, worldPosition = null) {
  * @param {string} mapName The map name
  * @param {string} mapUid The map UID
  * @param {string} thumbnailUrl URL for the map thumbnail
- * @param {string} countryCode The country code (e.g., 'CHI')
+ * @param {string} countryCode The country zone ID
  * @param {Array} records The leaderboard records
  * @param {Object} playerNames Mapping of account IDs to display names
  * @param {Object} t Translation strings
- * @returns {EmbedBuilder} The embed to display
+ * @returns {Promise<EmbedBuilder>} The embed to display
  */
-export function createCountryLeaderboardEmbed(mapName, mapUid, thumbnailUrl, countryCode = 'CHI', records, playerNames, t) {
-    const countryName = getCountryName(countryCode);
+export async function createCountryLeaderboardEmbed(mapName, mapUid, thumbnailUrl, countryCode, records, playerNames, t) {
+    const countryName = await getZoneName(countryCode);
     const embed = new EmbedBuilder()
         .setTitle(formatString(t.embeds.countryLeaderboard.title, { mapName: mapName || mapUid, country: countryName }))
         .setColor(0x00BFFF)

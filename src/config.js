@@ -49,12 +49,6 @@ export const MIN_REQUEST_INTERVAL = 800;
 export const TRACKMANIA_ICON_URL = 'https://www.trackmania.com/build/images/tm-logo.9b809b61.png';
 
 /**
- * Region configuration for country filtering
- * Imported from separate regions configuration file
- */
-export { REGIONS } from './config/regions.js';
-
-/**
  * Validates required environment variables are present
  * Exits the process if critical variables are missing
  */

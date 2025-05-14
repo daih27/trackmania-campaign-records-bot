@@ -7,8 +7,8 @@ import { getDisplayNames } from './oauth.js';
 import { formatTime, log } from './utils.js';
 import { getDb } from './db.js';
 import { getTranslations, setLanguage, getAvailableLanguages, formatString } from './localization/index.js';
-import { setDefaultCountry, getAvailableCountries, setAnnouncementChannel, setWeeklyShortsAnnouncementChannel, setMinWorldPosition } from './guildSettings.js';
-import { REGIONS, getCountryName } from './config/regions.js';
+import { setDefaultCountry, setAnnouncementChannel, setWeeklyShortsAnnouncementChannel, setMinWorldPosition } from './guildSettings.js';
+import { getZoneName, getAvailableCountries } from './config/zones.js';
 import { getDefaultCountry } from './guildSettings.js';
 import {
     fetchCurrentWeeklyShort,
@@ -22,9 +22,9 @@ import { fetchMapInfo, fetchPlayerNames } from './recordTracker.js';
 /**
  * Defines all available slash commands for the Discord bot with their options and descriptions
  * @param {Object} t - Translation strings for command names and descriptions
- * @returns {Array} Array of command configurations to register with Discord
+ * @returns {Promise<Array>} Array of command configurations to register with Discord
  */
-function getCommands(t) {
+async function getCommands(t) {
     return [
         new SlashCommandBuilder()
             .setName('register')
@@ -50,14 +50,10 @@ function getCommands(t) {
                     .setDescription(t.commands.leaderboardOption)
                     .setRequired(false))
             .addStringOption(option => {
-                const opt = option.setName('country')
+                return option.setName('country')
                     .setDescription(t.commands.leaderboardCountryOption || 'Select a country')
-                    .setRequired(false);
-                Object.keys(REGIONS).forEach(code => {
-                    opt.addChoices({ name: getCountryName(code), value: code });
-                });
-
-                return opt;
+                    .setRequired(false)
+                    .setAutocomplete(true);
             }),
 
         new SlashCommandBuilder()
@@ -68,14 +64,10 @@ function getCommands(t) {
                     .setDescription(t.commands.weeklyshortsleaderboardOption || 'Optional: filter by map name')
                     .setRequired(false))
             .addStringOption(option => {
-                const opt = option.setName('country')
+                return option.setName('country')
                     .setDescription(t.commands.weeklyshortsleaderboardCountryOption || 'Select a country')
-                    .setRequired(false);
-                Object.keys(REGIONS).forEach(code => {
-                    opt.addChoices({ name: getCountryName(code), value: code });
-                });
-
-                return opt;
+                    .setRequired(false)
+                    .setAutocomplete(true);
             }),
 
         new SlashCommandBuilder()
@@ -102,16 +94,10 @@ function getCommands(t) {
             .setName('setcountry')
             .setDescription(t.commands.setcountry || 'Set the default country for leaderboard')
             .addStringOption(option => {
-                option.setName('country')
+                return option.setName('country')
                     .setDescription(t.commands.setcountryOption || 'Country to use as default')
-                    .setRequired(true);
-
-                const countries = getAvailableCountries();
-                countries.forEach(country => {
-                    option.addChoices({ name: country.name, value: country.value });
-                });
-
-                return option;
+                    .setRequired(true)
+                    .setAutocomplete(true);
             }),
 
         new SlashCommandBuilder()
@@ -142,7 +128,7 @@ function getCommands(t) {
     ].map(command => command.toJSON());
 }
 
-let commands = getCommands(await getTranslations());
+let commands = await getCommands(await getTranslations());
 
 /**
  * Registers all bot commands with Discord's slash command system
@@ -155,7 +141,7 @@ async function registerCommands(clientId) {
         log('Started refreshing application (/) commands.');
 
         const t = await getTranslations();
-        commands = getCommands(t);
+        commands = await getCommands(t);
 
         await rest.put(
             Routes.applicationCommands(clientId),
@@ -379,11 +365,44 @@ async function handleHelp(interaction) {
 }
 
 /**
+ * Handles autocomplete interactions for country selection
+ * @param {Interaction} interaction - Discord autocomplete interaction
+ */
+async function handleAutocomplete(interaction) {
+    const { commandName, options } = interaction;
+    const focusedOption = options.getFocused(true);
+
+    if (focusedOption.name === 'country') {
+        try {
+            const countries = await getAvailableCountries();
+            const query = focusedOption.value.toLowerCase();
+
+            const filtered = countries
+                .filter(country => country.name.toLowerCase().includes(query))
+                .slice(0, 25);
+
+            await interaction.respond(filtered.map(country => ({
+                name: country.name,
+                value: country.value
+            })));
+        } catch (error) {
+            log(`Error in autocomplete: ${error.message}`, 'error');
+            await interaction.respond([]);
+        }
+    }
+}
+
+/**
  * Main interaction handler that routes slash commands to their appropriate handlers
  * Uses a command queue to prevent blocking and ensure commands are processed in order
  * @param {Interaction} interaction - Discord interaction object
  */
 async function handleInteraction(interaction) {
+    if (interaction.isAutocomplete()) {
+        await handleAutocomplete(interaction);
+        return;
+    }
+
     if (!interaction.isChatInputCommand()) return;
 
     const { commandName } = interaction;
@@ -503,7 +522,8 @@ async function handleSetCountry(interaction) {
         const result = await setDefaultCountry(guildId, countryCode);
 
         if (result) {
-            await interaction.editReply(formatString(t.responses.setcountry.changed, { country: countryCode }));
+            const countryName = await getZoneName(countryCode);
+            await interaction.editReply(formatString(t.responses.setcountry.changed, { country: countryName }));
         } else {
             await interaction.editReply(t.responses.setcountry.error);
         }
@@ -704,16 +724,17 @@ async function showWeeklyShortOverallLeaderboard(interaction, countryCode, t) {
         const overallRecords = await fetchWeeklyShortSeasonLeaderboard(seasonUid, countryCode, 5);
 
         if (overallRecords.length === 0) {
+            const countryName = await getZoneName(countryCode);
             return await interaction.editReply(
                 t.responses.weeklyshortsleaderboard?.noSeasonRecords ||
-                `No ${getCountryName(countryCode)} players found in the current weekly shorts.`
+                `No ${countryName} players found in the current weekly shorts.`
             );
         }
 
         const accountIds = overallRecords.map(r => r.accountId);
         const playerNames = await fetchPlayerNames(accountIds);
 
-        const embed = createWeeklyShortSeasonLeaderboardEmbed(
+        const embed = await createWeeklyShortSeasonLeaderboardEmbed(
             campaign.name,
             countryCode,
             overallRecords,
@@ -754,7 +775,7 @@ async function showWeeklyShortMapLeaderboard(interaction, mapName, countryCode, 
             const apiMap = mapList.find(map =>
                 map.name.toLowerCase().includes(mapName.toLowerCase())
             );
-            
+
             if (apiMap) {
                 matchingMap = {
                     map_uid: apiMap.uid,
@@ -781,10 +802,11 @@ async function showWeeklyShortMapLeaderboard(interaction, mapName, countryCode, 
         );
 
         if (mapRecords.length === 0) {
+            const countryName = await getZoneName(countryCode);
             return await interaction.editReply(
                 formatString(t.responses.weeklyshortsleaderboard?.noCountryRecords ||
                     'No records found for {country} in {mapName}.',
-                    { country: getCountryName(countryCode), mapName: matchingMap.name }
+                    { country: countryName, mapName: matchingMap.name }
                 )
             );
         }
@@ -792,7 +814,7 @@ async function showWeeklyShortMapLeaderboard(interaction, mapName, countryCode, 
         const accountIds = mapRecords.map(r => r.accountId);
         const playerNames = await fetchPlayerNames(accountIds);
 
-        const embed = createWeeklyShortMapLeaderboardEmbed(
+        const embed = await createWeeklyShortMapLeaderboardEmbed(
             matchingMap.name,
             matchingMap.map_uid,
             matchingMap.thumbnail_url,

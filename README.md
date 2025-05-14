@@ -10,7 +10,6 @@ A Discord bot that tracks and announces Trackmania player records for campaign m
 - Automatic announcements for weekly shorts personal bests
 - Multi-language support (English and Spanish for now)
 - Leaderboard commands with country filtering
-- Expandable to more languages and countries if needed
 
 ## Installation
 
