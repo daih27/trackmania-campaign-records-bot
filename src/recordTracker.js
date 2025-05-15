@@ -2,7 +2,7 @@ import { makeRateLimitedRequest } from './api.js';
 import { ensureToken, invalidateTokens } from './auth.js';
 import { formatTime, log } from './utils.js';
 import { getDb } from './db.js';
-import { getPlayers } from './playerManager.js';
+import { getGuildPlayers } from './playerManager.js';
 import { getTranslations, formatString } from './localization/index.js';
 import { EmbedBuilder } from 'discord.js';
 import { getZoneName, getZoneNamesForCountry } from './config/zones.js';
@@ -504,10 +504,20 @@ export async function checkRecords(client) {
     try {
         log('Starting record check...');
 
-        const players = await getPlayers();
+        const guilds = client.guilds.cache;
+        const guildPlayerMap = new Map();
+        const allAccountIds = new Set();
 
-        if (players.length === 0) {
-            log('No players registered, skipping record check');
+        for (const [guildId, guild] of guilds) {
+            const guildPlayers = await getGuildPlayers(guildId);
+            if (guildPlayers.length > 0) {
+                guildPlayerMap.set(guildId, guildPlayers);
+                guildPlayers.forEach(p => allAccountIds.add(p.account_id));
+            }
+        }
+
+        if (allAccountIds.size === 0) {
+            log('No players registered across all guilds, skipping record check');
             return;
         }
 
@@ -515,9 +525,10 @@ export async function checkRecords(client) {
         const seasonId = campaign.leaderboardGroupUid;
         const mapUids = campaign.playlist.map(m => m.mapUid);
         log(`Found ${mapUids.length} maps in current campaign`);
+        log(`Checking records for ${allAccountIds.size} unique players across ${guildPlayerMap.size} guilds`);
 
         const mapList = await fetchMapInfo(mapUids);
-        const accountIds = players.map(p => p.account_id);
+        const accountIds = Array.from(allAccountIds);
 
         const playersWithUpdates = new Set();
 
@@ -553,7 +564,12 @@ export async function checkRecords(client) {
                         continue;
                     }
 
-                    const player = players.find(p => p.account_id === accountId);
+                    let player = null;
+                    for (const [guildId, guildPlayers] of guildPlayerMap) {
+                        player = guildPlayers.find(p => p.account_id === accountId);
+                        if (player) break;
+                    }
+
                     if (!player) {
                         log(`Unknown player with accountId ${accountId}`, 'warn');
                         continue;
@@ -586,12 +602,14 @@ export async function checkRecords(client) {
                 const displayNames = await getDisplayNamesBatch(updatedAccountIds);
                 for (const accountId of updatedAccountIds) {
                     if (displayNames[accountId]) {
-                        const player = players.find(p => p.account_id === accountId);
-                        if (player) {
-                            await db.run(
-                                'UPDATE players SET username = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-                                [displayNames[accountId], player.id]
-                            );
+                        for (const [guildId, guildPlayers] of guildPlayerMap) {
+                            const player = guildPlayers.find(p => p.account_id === accountId);
+                            if (player) {
+                                await db.run(
+                                    'UPDATE players SET username = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+                                    [displayNames[accountId], player.id]
+                                );
+                            }
                         }
                     }
                 }

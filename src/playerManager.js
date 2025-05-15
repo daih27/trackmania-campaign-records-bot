@@ -4,63 +4,67 @@ import { getDisplayNames } from './oauth.js';
 import { tmOAuthClientId, tmOAuthClientSecret } from './config.js';
 
 /**
- * Gets all registered players from the database
+ * Gets all registered players for a specific guild
+ * @param {string} guildId - Discord guild ID
  * @returns {Promise<Array>} Array of player objects with their account information
  */
-export async function getPlayers() {
+export async function getGuildPlayers(guildId) {
     const db = await getDb();
-    const players = await db.all('SELECT * FROM players');
+    const players = await db.all('SELECT * FROM players WHERE guild_id = ?', guildId);
     return players;
 }
 
 /**
- * Gets a player record by their Discord ID
+ * Gets a player record by their Discord ID and Guild ID
  * @param {string} discordId - Discord user ID
+ * @param {string} guildId - Discord guild ID  
  * @returns {Promise<Object|null>} Player object or null if not found
  */
-export async function getPlayerByDiscordId(discordId) {
+export async function getPlayerByDiscordId(discordId, guildId) {
     const db = await getDb();
-    return await db.get('SELECT * FROM players WHERE discord_id = ?', discordId);
+    return await db.get('SELECT * FROM players WHERE discord_id = ? AND guild_id = ?', discordId, guildId);
 }
 
 /**
- * Gets a player record by their Trackmania account ID
+ * Gets a player record by their Trackmania account ID and Guild ID
  * @param {string} accountId - Trackmania account ID
+ * @param {string} guildId - Discord guild ID
  * @returns {Promise<Object|null>} Player object or null if not found
  */
-export async function getPlayerByAccountId(accountId) {
+export async function getPlayerByAccountId(accountId, guildId) {
     const db = await getDb();
-    return await db.get('SELECT * FROM players WHERE account_id = ?', accountId);
+    return await db.get('SELECT * FROM players WHERE account_id = ? AND guild_id = ?', accountId, guildId);
 }
 
 /**
  * Registers a new player or updates an existing one
- * Links a Discord user to their Trackmania account
+ * Links a Discord user to their Trackmania account for a specific guild
  * @param {string} discordId - Discord user ID
+ * @param {string} guildId - Discord guild ID
  * @param {string} accountId - Trackmania account ID
  * @param {string} username - Optional username (defaults to Discord username)
  * @returns {Promise<Object>} Result object with success status and player data
  */
-export async function registerPlayer(discordId, accountId, username = null) {
+export async function registerPlayer(discordId, guildId, accountId, username = null) {
     const db = await getDb();
 
     try {
-        const existingPlayer = await getPlayerByDiscordId(discordId);
+        const existingPlayer = await getPlayerByDiscordId(discordId, guildId);
 
         if (existingPlayer) {
             await db.run(
-                'UPDATE players SET account_id = ?, username = ?, updated_at = CURRENT_TIMESTAMP WHERE discord_id = ?',
-                [accountId, username, discordId]
+                'UPDATE players SET account_id = ?, username = ?, updated_at = CURRENT_TIMESTAMP WHERE discord_id = ? AND guild_id = ?',
+                [accountId, username, discordId, guildId]
             );
-            log(`Updated player with Discord ID ${discordId}`);
-            return { success: true, updated: true, player: await getPlayerByDiscordId(discordId) };
+            log(`Updated player with Discord ID ${discordId} in guild ${guildId}`);
+            return { success: true, updated: true, player: await getPlayerByDiscordId(discordId, guildId) };
         } else {
             await db.run(
-                'INSERT INTO players (discord_id, account_id, username) VALUES (?, ?, ?)',
-                [discordId, accountId, username]
+                'INSERT INTO players (discord_id, guild_id, account_id, username) VALUES (?, ?, ?, ?)',
+                [discordId, guildId, accountId, username]
             );
-            log(`Registered new player with Discord ID ${discordId}`);
-            return { success: true, updated: false, player: await getPlayerByDiscordId(discordId) };
+            log(`Registered new player with Discord ID ${discordId} in guild ${guildId}`);
+            return { success: true, updated: false, player: await getPlayerByDiscordId(discordId, guildId) };
         }
     } catch (error) {
         log(`Error registering player: ${error.message}`, 'error');
@@ -69,21 +73,22 @@ export async function registerPlayer(discordId, accountId, username = null) {
 }
 
 /**
- * Unregisters a player by removing their Discord ID association
+ * Unregisters a player by removing their Discord ID association for a specific guild
  * @param {string} discordId - Discord user ID
+ * @param {string} guildId - Discord guild ID
  * @returns {Promise<Object>} Result object with success status
  */
-export async function unregisterPlayer(discordId) {
+export async function unregisterPlayer(discordId, guildId) {
     const db = await getDb();
 
     try {
-        const player = await getPlayerByDiscordId(discordId);
+        const player = await getPlayerByDiscordId(discordId, guildId);
         if (!player) {
             return { success: false, error: 'Player not found' };
         }
 
-        await db.run('DELETE FROM players WHERE discord_id = ?', discordId);
-        log(`Unregistered player with Discord ID ${discordId}`);
+        await db.run('DELETE FROM players WHERE discord_id = ? AND guild_id = ?', discordId, guildId);
+        log(`Unregistered player with Discord ID ${discordId} from guild ${guildId}`);
         return { success: true };
     } catch (error) {
         log(`Error unregistering player: ${error.message}`, 'error');

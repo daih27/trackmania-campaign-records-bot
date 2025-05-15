@@ -2,8 +2,8 @@ import { makeRateLimitedRequest } from './api.js';
 import { ensureToken, invalidateTokens } from './auth.js';
 import { log } from './utils.js';
 import { getDb } from './db.js';
-import { getPlayers } from './playerManager.js';
-import { getTranslations, formatString } from './localization/index.js';
+import { getGuildPlayers } from './playerManager.js';
+import { getTranslations } from './localization/index.js';
 import { EmbedBuilder } from 'discord.js';
 import { getZoneName, getZoneNamesForCountry } from './config/zones.js';
 import { getDisplayNamesBatch } from './oauth.js';
@@ -121,13 +121,13 @@ export async function fetchWeeklyShortCountryLeaderboard(mapUid, seasonUid, coun
  */
 export async function getWeeklyShortMapFromDb(mapUid) {
     const db = await getDb();
-    
+
     try {
         const map = await db.get(
             'SELECT map_uid, map_id, name, thumbnail_url FROM weekly_short_maps WHERE map_uid = ?',
             mapUid
         );
-        
+
         return map;
     } catch (error) {
         log(`Error getting weekly short map from database: ${error.message}`, 'error');
@@ -244,7 +244,7 @@ async function getWeeklyShortPlayerPositions(mapUid, seasonUid, accountIds, maxP
         const playerRecords = {};
         let offset = 0;
         const limit = 100;
-        
+
         while (Object.keys(playerRecords).length < accountIds.length && offset < maxPosition) {
             const response = await makeRateLimitedRequest({
                 method: 'get',
@@ -257,7 +257,7 @@ async function getWeeklyShortPlayerPositions(mapUid, seasonUid, accountIds, maxP
             }
 
             const records = response.data.tops[0].top;
-            
+
             for (const record of records) {
                 if (accountIds.includes(record.accountId)) {
                     playerRecords[record.accountId] = {
@@ -267,14 +267,14 @@ async function getWeeklyShortPlayerPositions(mapUid, seasonUid, accountIds, maxP
                     };
                 }
             }
-            
+
             if (Object.keys(playerRecords).length === accountIds.length) {
                 break;
             }
-            
+
             offset += limit;
         }
-        
+
         return playerRecords;
     } catch (error) {
         log(`Error getting weekly short player positions: ${error.message}`, 'error');
@@ -317,7 +317,7 @@ export async function fetchWeeklyShortLeaderboard(mapUid, seasonUid, length = 10
     const liveToken = await ensureToken('NadeoLiveServices');
 
     log(`Fetching weekly short leaderboard for map ${mapUid} (offset: ${offset}, length: ${length})`);
-    
+
     const response = await makeRateLimitedRequest({
         method: 'get',
         url: `https://live-services.trackmania.nadeo.live/api/token/leaderboard/group/${seasonUid}/map/${mapUid}/top?length=${length}&onlyWorld=true&offset=${offset}`,
@@ -449,8 +449,8 @@ export function createWeeklyShortEmbed(record, t) {
     const isImprovement = record.previous_position !== null;
     const emoji = '🏆';
 
-    const recordType = isImprovement 
-        ? 'set a new personal best' 
+    const recordType = isImprovement
+        ? 'set a new personal best'
         : 'set their first time';
 
     const embed = new EmbedBuilder()
@@ -477,7 +477,7 @@ export function createWeeklyShortEmbed(record, t) {
         } else {
             changeText = '→ Same position';
         }
-        
+
         embed.addFields(
             { name: 'Previous Position', value: `#${record.previous_position}`, inline: true },
             { name: 'Position Change', value: changeText, inline: true }
@@ -501,23 +501,34 @@ export async function checkWeeklyShorts(client, defaultMaxPosition = 10000) {
     try {
         log('Starting weekly shorts check...');
 
-        const players = await getPlayers();
-        if (players.length === 0) {
-            log('No players registered, skipping weekly shorts check');
+        const guilds = client.guilds.cache;
+        const guildPlayerMap = new Map();
+        const allAccountIds = new Set();
+
+        for (const [guildId, guild] of guilds) {
+            const guildPlayers = await getGuildPlayers(guildId);
+            if (guildPlayers.length > 0) {
+                guildPlayerMap.set(guildId, guildPlayers);
+                guildPlayers.forEach(p => allAccountIds.add(p.account_id));
+            }
+        }
+
+        if (allAccountIds.size === 0) {
+            log('No players registered across all guilds, skipping weekly shorts check');
             return;
         }
 
         const campaign = await fetchCurrentWeeklyShort();
         const seasonUid = campaign.seasonUid;
         const mapUids = campaign.playlist.map(m => m.mapUid);
-        
+
         log(`Fetching info for ${mapUids.length} weekly short maps`);
+        log(`Checking weekly shorts for ${allAccountIds.size} unique players across ${guildPlayerMap.size} guilds`);
         const mapList = await fetchMapInfo(mapUids);
-        const accountIds = players.map(p => p.account_id);
-        
-        const guilds = client.guilds.cache;
+        const accountIds = Array.from(allAccountIds);
+
         let lowestMinPosition = defaultMaxPosition;
-        
+
         for (const [guildId] of guilds) {
             try {
                 const minPosition = await getMinWorldPosition(guildId);
@@ -528,9 +539,9 @@ export async function checkWeeklyShorts(client, defaultMaxPosition = 10000) {
                 log(`Error getting min position for guild ${guildId}: ${error.message}`, 'warn');
             }
         }
-        
+
         log(`Using minimum position threshold: ${lowestMinPosition} (from guild settings)`);
-        
+
         for (let i = 0; i < mapList.length; i++) {
             const map = mapList[i];
             const mapInfo = campaign.playlist[i];
@@ -539,12 +550,12 @@ export async function checkWeeklyShorts(client, defaultMaxPosition = 10000) {
             const mapName = map.name || `Week ${campaign.week} - Map ${mapInfo.position + 1}`;
             const mapPosition = mapInfo.position;
             const thumbnailUrl = map.thumbnailUrl;
-            
+
             if (!mapId) {
                 log(`No mapId found for map ${mapUid}, skipping`, 'warn');
                 continue;
             }
-            
+
             const dbMapId = await storeWeeklyShortMap(db, mapUid, mapId, mapName, seasonUid, mapPosition, thumbnailUrl);
 
             log(`Fetching current records for weekly short map ${mapName} (${mapUid})`);
@@ -557,25 +568,30 @@ export async function checkWeeklyShorts(client, defaultMaxPosition = 10000) {
 
             const currentRecords = {};
             const playersWithNewRecords = [];
-            
+
             if (recordResponse.data && Array.isArray(recordResponse.data)) {
                 for (const record of recordResponse.data) {
                     if (!record.removed) {
                         const accountId = record.accountId;
                         const timestamp = record.timestamp ? new Date(record.timestamp).getTime() : 0;
-                        
+
                         currentRecords[accountId] = {
                             timestamp,
                             time: record.recordScore?.time || record.time
                         };
-                        
-                        const player = players.find(p => p.account_id === accountId);
+
+                        let player = null;
+                        for (const [guildId, guildPlayers] of guildPlayerMap) {
+                            player = guildPlayers.find(p => p.account_id === accountId);
+                            if (player) break;
+                        }
+
                         if (player) {
                             const existingRecord = await db.get(
                                 'SELECT timestamp FROM weekly_short_records WHERE player_id = ? AND map_id = ?',
                                 [player.id, dbMapId]
                             );
-                            
+
                             if (!existingRecord || timestamp > existingRecord.timestamp) {
                                 playersWithNewRecords.push(accountId);
                                 log(`Player ${accountId} has a new/improved record (timestamp: ${timestamp})`);
@@ -594,12 +610,17 @@ export async function checkWeeklyShorts(client, defaultMaxPosition = 10000) {
             const playerPositions = await getWeeklyShortPlayerPositions(mapUid, seasonUid, playersWithNewRecords, lowestMinPosition);
 
             for (const accountId of playersWithNewRecords) {
-                const player = players.find(p => p.account_id === accountId);
+                let player = null;
+                for (const [guildId, guildPlayers] of guildPlayerMap) {
+                    player = guildPlayers.find(p => p.account_id === accountId);
+                    if (player) break;
+                }
+
                 if (!player || !playerPositions[accountId]) continue;
 
                 const position = playerPositions[accountId].position;
                 const timestamp = currentRecords[accountId].timestamp;
-                
+
                 log(`Processing improved record: ${accountId} on map ${mapPosition + 1}: #${position} (timestamp: ${timestamp})`);
                 const result = await updateWeeklyShortRecord(db, player.id, dbMapId, position, timestamp);
 

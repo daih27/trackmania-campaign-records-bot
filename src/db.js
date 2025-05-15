@@ -37,12 +37,17 @@ export async function initDatabase() {
     await db.exec(`
     CREATE TABLE IF NOT EXISTS players (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
-      discord_id TEXT NOT NULL UNIQUE,
-      account_id TEXT NOT NULL UNIQUE,
+      discord_id TEXT NOT NULL,
+      guild_id TEXT NOT NULL,
+      account_id TEXT NOT NULL,
       username TEXT,
       registered_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(discord_id, guild_id)
     );
+    
+    CREATE INDEX IF NOT EXISTS idx_players_guild_id ON players(guild_id);
+    CREATE INDEX IF NOT EXISTS idx_players_account_id ON players(account_id);
     
     CREATE TABLE IF NOT EXISTS maps (
       id INTEGER PRIMARY KEY AUTOINCREMENT,

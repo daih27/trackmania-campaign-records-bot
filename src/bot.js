@@ -162,6 +162,7 @@ async function handleRegister(interaction) {
     const accountId = interaction.options.getString('account_id');
     let username = interaction.user.username;
     const t = await getTranslations(interaction.guildId);
+    const guildId = interaction.guildId;
 
     try {
         await interaction.deferReply();
@@ -179,7 +180,7 @@ async function handleRegister(interaction) {
             }
         }
 
-        const result = await registerPlayer(interaction.user.id, accountId, username);
+        const result = await registerPlayer(interaction.user.id, guildId, accountId, username);
 
         if (result.success) {
             if (result.updated) {
@@ -202,10 +203,11 @@ async function handleRegister(interaction) {
  */
 async function handleUnregister(interaction) {
     const t = await getTranslations(interaction.guildId);
+    const guildId = interaction.guildId;
 
     try {
         await interaction.deferReply();
-        const result = await unregisterPlayer(interaction.user.id);
+        const result = await unregisterPlayer(interaction.user.id, guildId);
 
         if (result.success) {
             await interaction.editReply(t.responses.unregister.success);
@@ -224,10 +226,11 @@ async function handleUnregister(interaction) {
  */
 async function handleRecords(interaction) {
     const t = await getTranslations(interaction.guildId);
+    const guildId = interaction.guildId;
 
     try {
         await interaction.deferReply();
-        const player = await getPlayerByDiscordId(interaction.user.id);
+        const player = await getPlayerByDiscordId(interaction.user.id, guildId);
 
         if (!player) {
             return await interaction.editReply(t.responses.records.notRegistered);
