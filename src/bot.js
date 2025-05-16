@@ -769,9 +769,22 @@ async function showWeeklyShortMapLeaderboard(interaction, mapName, countryCode, 
             campaign.seasonUid
         );
 
-        let matchingMap = dbMaps.find(map =>
-            map.name.toLowerCase().includes(mapName.toLowerCase())
-        );
+        const isMapNumber = /^[1-5]$/.test(mapName);
+        
+        let matchingMap;
+        if (isMapNumber) {
+            const mapNumber = parseInt(mapName);
+            matchingMap = dbMaps.find(map => {
+                if (map.name.match(new RegExp(`^${mapNumber}\s*-`))) {
+                    return true;
+                }
+                return map.position === mapNumber - 1;
+            });
+        } else {
+            matchingMap = dbMaps.find(map =>
+                map.name.toLowerCase().includes(mapName.toLowerCase())
+            );
+        }
 
         if (!matchingMap) {
             const mapList = await fetchMapInfo(mapUids);

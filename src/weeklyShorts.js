@@ -214,7 +214,7 @@ export async function createWeeklyShortMapLeaderboardEmbed(mapName, mapUid, thum
     const embed = new EmbedBuilder()
         .setTitle(t.embeds.countryLeaderboard.title
             .replace('{country}', countryName)
-            .replace('{mapName}', `Weekly Short: ${mapName || mapUid}`))
+            .replace('{mapName}', `Weekly Short: ${cleanMapName(mapName) || mapUid}`))
         .setColor(0xFF6B6B)
         .setAuthor({ name: `Trackmania Weekly Shorts`, iconURL: TRACKMANIA_ICON_URL })
         .setDescription(t.embeds.countryLeaderboard.description
@@ -366,10 +366,20 @@ export async function fetchWeeklyShortLeaderboard(mapUid, seasonUid, length = 10
  */
 export async function storeWeeklyShortMap(db, mapUid, mapId, name, seasonUid, position, thumbnailUrl) {
     try {
-        const cleanedName = cleanMapName(name);
+        let cleanedName = cleanMapName(name);
 
         if (cleanedName !== name) {
             log(`Cleaned map name: "${name}" -> "${cleanedName}"`);
+        }
+
+        const weeklyMatch = cleanedName.match(/^(\d+)\s*-\s*(.+)$/);
+        if (weeklyMatch) {
+            const mapNumber = parseInt(weeklyMatch[1]);
+            const mapTitle = weeklyMatch[2].trim();
+            cleanedName = `${mapNumber} - ${mapTitle}`;
+        } else if (position !== undefined && position !== null) {
+            const displayPosition = position + 1;
+            cleanedName = `${displayPosition} - ${cleanedName}`;
         }
 
         const existingMap = await db.get('SELECT id FROM weekly_short_maps WHERE map_uid = ?', mapUid);
@@ -420,7 +430,7 @@ export function createWeeklyShortEmbed(record, t) {
             .replace('{recordType}', recordType))
         .setAuthor({ name: 'Trackmania Weekly Shorts', iconURL: TRACKMANIA_ICON_URL })
         .addFields(
-            { name: t.embeds.newRecord.map, value: `**${record.map_name || 'Unknown Map'}**`, inline: false },
+            { name: t.embeds.newRecord.map, value: `**${cleanMapName(record.map_name) || 'Unknown Map'}**`, inline: false },
             { name: t.embeds.newRecord.worldPosition, value: `**#${record.position}**`, inline: true }
         );
 

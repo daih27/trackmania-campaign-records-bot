@@ -425,6 +425,14 @@ async function updateMapRecord(db, playerId, mapId, timeMs, playerRegisteredAt, 
  */
 export async function storeMap(db, mapUid, mapId, name, seasonUid, thumbnailUrl) {
     try {
+        let cleanedName = name;
+        const campaignMatch = name.match(/(.*\s+\d{4})\s*-\s*(\d+)/);
+        if (campaignMatch) {
+            const seasonName = campaignMatch[1].trim();
+            const mapNumber = parseInt(campaignMatch[2]).toString().padStart(2, '0');
+            cleanedName = `${seasonName} - ${mapNumber}`;
+        }
+        
         const existingMap = await db.get('SELECT id FROM maps WHERE map_uid = ?', mapUid);
 
         if (existingMap) {
@@ -432,14 +440,14 @@ export async function storeMap(db, mapUid, mapId, name, seasonUid, thumbnailUrl)
                 `UPDATE maps
          SET map_id = ?, name = ?, season_uid = ?, thumbnail_url = ?, last_checked = CURRENT_TIMESTAMP
          WHERE map_uid = ?`,
-                [mapId, name, seasonUid, thumbnailUrl, mapUid]
+                [mapId, cleanedName, seasonUid, thumbnailUrl, mapUid]
             );
             return existingMap.id;
         } else {
             const result = await db.run(
                 `INSERT INTO maps (map_uid, map_id, name, season_uid, thumbnail_url)
          VALUES (?, ?, ?, ?, ?)`,
-                [mapUid, mapId, name, seasonUid, thumbnailUrl]
+                [mapUid, mapId, cleanedName, seasonUid, thumbnailUrl]
             );
             return result.lastID;
         }

@@ -51,10 +51,28 @@ async function handleLeaderboard(interaction) {
                 }
             }
 
-            const mapSearch = await db.all(
-                "SELECT id, name, map_uid, thumbnail_url FROM maps WHERE name LIKE ? OR map_uid = ? LIMIT 1",
-                [`%${mapName}%`, mapName]
-            );
+            const isMapNumber = /^\d{1,2}$/.test(mapName);
+
+            let mapSearch;
+            if (isMapNumber) {
+                const paddedNumber = mapName.padStart(2, '0');
+                mapSearch = await db.all(
+                    "SELECT id, name, map_uid, thumbnail_url FROM maps WHERE name LIKE ? LIMIT 1",
+                    [`%- ${paddedNumber}%`]
+                );
+
+                if (mapSearch.length === 0) {
+                    mapSearch = await db.all(
+                        "SELECT id, name, map_uid, thumbnail_url FROM maps WHERE name LIKE ? LIMIT 1",
+                        [`%- ${parseInt(mapName)}%`]
+                    );
+                }
+            } else {
+                mapSearch = await db.all(
+                    "SELECT id, name, map_uid, thumbnail_url FROM maps WHERE name LIKE ? OR map_uid = ? LIMIT 1",
+                    [`%${mapName}%`, mapName]
+                );
+            }
 
             if (mapSearch.length === 0) {
                 return await interaction.editReply(formatString(t.responses.leaderboard.noRecordsMap, { mapName }));
