@@ -41,8 +41,8 @@ export async function initDatabase() {
       guild_id TEXT NOT NULL,
       account_id TEXT NOT NULL,
       username TEXT,
-      registered_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      registered_at TIMESTAMP DEFAULT (datetime('now')),
+      updated_at TIMESTAMP DEFAULT (datetime('now')),
       UNIQUE(discord_id, guild_id)
     );
     
@@ -56,7 +56,7 @@ export async function initDatabase() {
       name TEXT,
       season_uid TEXT,
       thumbnail_url TEXT,
-      last_checked TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      last_checked TIMESTAMP DEFAULT (datetime('now'))
     );
     
     CREATE TABLE IF NOT EXISTS records (
@@ -64,7 +64,7 @@ export async function initDatabase() {
       player_id INTEGER NOT NULL,
       map_id INTEGER NOT NULL,
       time_ms INTEGER NOT NULL,
-      recorded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      recorded_at TIMESTAMP DEFAULT (datetime('now')),
       announced BOOLEAN DEFAULT 0,
       FOREIGN KEY(player_id) REFERENCES players(id) ON DELETE CASCADE,
       FOREIGN KEY(map_id) REFERENCES maps(id) ON DELETE CASCADE,
@@ -77,7 +77,7 @@ export async function initDatabase() {
       map_id INTEGER NOT NULL,
       time_ms INTEGER NOT NULL,
       previous_time_ms INTEGER,
-      recorded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      recorded_at TIMESTAMP DEFAULT (datetime('now')),
       FOREIGN KEY(player_id) REFERENCES players(id) ON DELETE CASCADE,
       FOREIGN KEY(map_id) REFERENCES maps(id) ON DELETE CASCADE
     );
@@ -90,8 +90,8 @@ export async function initDatabase() {
       weekly_shorts_channel_id TEXT,
       default_zone_id TEXT,
       min_world_position INTEGER DEFAULT 5000,
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      created_at TIMESTAMP DEFAULT (datetime('now')),
+      updated_at TIMESTAMP DEFAULT (datetime('now'))
     );
     
     CREATE TABLE IF NOT EXISTS weekly_short_maps (
@@ -102,16 +102,16 @@ export async function initDatabase() {
       season_uid TEXT,
       position INTEGER,
       thumbnail_url TEXT,
-      last_checked TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      last_checked TIMESTAMP DEFAULT (datetime('now'))
     );
     
     CREATE TABLE IF NOT EXISTS weekly_short_records (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       player_id INTEGER NOT NULL,
       map_id INTEGER NOT NULL,
-      position INTEGER NOT NULL,
+      position INTEGER,
       timestamp INTEGER,
-      recorded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      recorded_at TIMESTAMP DEFAULT (datetime('now')),
       announced BOOLEAN DEFAULT 0,
       FOREIGN KEY(player_id) REFERENCES players(id) ON DELETE CASCADE,
       FOREIGN KEY(map_id) REFERENCES weekly_short_maps(id) ON DELETE CASCADE,
@@ -122,12 +122,26 @@ export async function initDatabase() {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       player_id INTEGER NOT NULL,
       map_id INTEGER NOT NULL,
-      position INTEGER NOT NULL,
+      position INTEGER,
       previous_position INTEGER,
       timestamp INTEGER,
-      recorded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      recorded_at TIMESTAMP DEFAULT (datetime('now')),
       FOREIGN KEY(player_id) REFERENCES players(id) ON DELETE CASCADE,
       FOREIGN KEY(map_id) REFERENCES weekly_short_maps(id) ON DELETE CASCADE
+    );
+    
+    CREATE TABLE IF NOT EXISTS guild_announcement_status (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      guild_id TEXT NOT NULL,
+      record_id INTEGER,
+      weekly_short_record_id INTEGER,
+      ineligible_for_announcement BOOLEAN DEFAULT 0,
+      existed_before_registration BOOLEAN DEFAULT 0,
+      created_at TIMESTAMP DEFAULT (datetime('now')),
+      FOREIGN KEY(record_id) REFERENCES records(id) ON DELETE CASCADE,
+      FOREIGN KEY(weekly_short_record_id) REFERENCES weekly_short_records(id) ON DELETE CASCADE,
+      UNIQUE(guild_id, record_id),
+      UNIQUE(guild_id, weekly_short_record_id)
     );
   `);
 

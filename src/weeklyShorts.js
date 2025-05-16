@@ -147,16 +147,20 @@ export async function getWeeklyShortMapFromDb(mapUid) {
 export async function createWeeklyShortSeasonLeaderboardEmbed(seasonName, countryCode, records, playerNames, t) {
     const countryName = await getZoneName(countryCode);
     const embed = new EmbedBuilder()
-        .setTitle(`🏆 ${countryName} Weekly Shorts: ${seasonName}`)
+        .setTitle(t.embeds.seasonLeaderboard.title
+            .replace('{country}', countryName)
+            .replace('{season}', `Weekly Shorts: ${seasonName}`))
         .setColor(0xFF6B6B)
         .setAuthor({ name: `Trackmania Weekly Shorts`, iconURL: TRACKMANIA_ICON_URL })
-        .setDescription(`Top ${records.length} ${countryName} players in the current weekly shorts`)
+        .setDescription(t.embeds.seasonLeaderboard.description
+            .replace('{count}', records.length)
+            .replace('{country}', countryName))
         .setTimestamp(new Date());
 
     if (records.length === 0) {
         embed.addFields({
-            name: `No ${countryName} Records`,
-            value: `No records found for ${countryName} players in this weekly shorts season.`,
+            name: t.embeds.seasonLeaderboard.noRecords.replace('{country}', countryName),
+            value: t.embeds.seasonLeaderboard.noRecordsDesc.replace('{country}', countryName),
             inline: false
         });
     } else {
@@ -174,7 +178,7 @@ export async function createWeeklyShortSeasonLeaderboardEmbed(seasonName, countr
 
             embed.addFields({
                 name: `#${index + 1}: ${playerName}`,
-                value: `Points: **${points.toLocaleString()}${pointsDifferential}**\nPosition: #${record.position} worldwide`,
+                value: `${t.embeds.seasonLeaderboard.points}: **${points.toLocaleString()}${pointsDifferential}**\n${t.embeds.seasonLeaderboard.position}: #${record.position} ${t.embeds.seasonLeaderboard.worldwide}`,
                 inline: false
             });
         });
@@ -197,10 +201,14 @@ export async function createWeeklyShortSeasonLeaderboardEmbed(seasonName, countr
 export async function createWeeklyShortMapLeaderboardEmbed(mapName, mapUid, thumbnailUrl, countryCode, records, playerNames, t) {
     const countryName = await getZoneName(countryCode);
     const embed = new EmbedBuilder()
-        .setTitle(`🏆 ${countryName} Weekly Short: ${mapName || mapUid}`)
+        .setTitle(t.embeds.countryLeaderboard.title
+            .replace('{country}', countryName)
+            .replace('{mapName}', `Weekly Short: ${mapName || mapUid}`))
         .setColor(0xFF6B6B)
         .setAuthor({ name: `Trackmania Weekly Shorts`, iconURL: TRACKMANIA_ICON_URL })
-        .setDescription(`Top ${records.length} ${countryName} records for this weekly short map`)
+        .setDescription(t.embeds.countryLeaderboard.description
+            .replace('{count}', records.length)
+            .replace('{country}', countryName))
         .setTimestamp(new Date());
 
     if (thumbnailUrl && thumbnailUrl.startsWith('http')) {
@@ -209,8 +217,8 @@ export async function createWeeklyShortMapLeaderboardEmbed(mapName, mapUid, thum
 
     if (records.length === 0) {
         embed.addFields({
-            name: `No ${countryName} Records`,
-            value: `No records found for ${countryName} players on this map.`,
+            name: t.embeds.countryLeaderboard.noRecords.replace('{country}', countryName),
+            value: t.embeds.countryLeaderboard.noRecordsDesc.replace('{country}', countryName),
             inline: false
         });
     } else {
@@ -220,7 +228,7 @@ export async function createWeeklyShortMapLeaderboardEmbed(mapName, mapUid, thum
 
             embed.addFields({
                 name: `#${index + 1}: ${playerName}`,
-                value: `Position: **#${position}** worldwide`,
+                value: `${t.embeds.countryLeaderboard.position}: **#${position}** ${t.embeds.countryLeaderboard.worldwide}`,
                 inline: false
             });
         });
@@ -371,73 +379,6 @@ export async function storeWeeklyShortMap(db, mapUid, mapId, name, seasonUid, po
     }
 }
 
-/**
- * Updates a player's record for a weekly short map based on timestamp
- * @param {Database} db - Database connection
- * @param {number} playerId - Player database ID
- * @param {number} mapId - Map database ID
- * @param {number} position - The player's position on the leaderboard
- * @param {number} timestamp - The timestamp when the record was set
- * @returns {Object} Result object indicating if it's a new personal best
- */
-async function updateWeeklyShortRecord(db, playerId, mapId, position, timestamp) {
-    try {
-        const currentRecord = await db.get(
-            'SELECT position, timestamp FROM weekly_short_records WHERE player_id = ? AND map_id = ?',
-            [playerId, mapId]
-        );
-
-        if (!currentRecord) {
-            await db.run(
-                `INSERT INTO weekly_short_history (player_id, map_id, position, previous_position, timestamp) 
-                 VALUES (?, ?, ?, ?, ?)`,
-                [playerId, mapId, position, null, timestamp]
-            );
-
-            await db.run(
-                `INSERT INTO weekly_short_records (player_id, map_id, position, timestamp, announced) 
-                 VALUES (?, ?, ?, ?, 1)`,
-                [playerId, mapId, position, timestamp]
-            );
-
-            return {
-                improved: false,
-                isFirstRecord: true,
-                previousPosition: null
-            };
-        } else if (timestamp > currentRecord.timestamp) {
-            await db.run(
-                `INSERT INTO weekly_short_history (player_id, map_id, position, previous_position, timestamp) 
-                 VALUES (?, ?, ?, ?, ?)`,
-                [playerId, mapId, position, currentRecord.position, timestamp]
-            );
-
-            await db.run(
-                `UPDATE weekly_short_records 
-                 SET position = ?, timestamp = ?, recorded_at = CURRENT_TIMESTAMP, announced = 0
-                 WHERE player_id = ? AND map_id = ?`,
-                [position, timestamp, playerId, mapId]
-            );
-
-            return {
-                improved: true,
-                previousPosition: currentRecord.position,
-                isFirstRecord: false
-            };
-        }
-        return {
-            improved: false,
-            isFirstRecord: false
-        };
-    } catch (error) {
-        log(`Error updating weekly short record: ${error.message}`, 'error');
-        return {
-            improved: false,
-            isFirstRecord: false,
-            error: error.message
-        };
-    }
-}
 
 /**
  * Creates a Discord embed for a weekly short personal best announcement
@@ -450,17 +391,20 @@ export function createWeeklyShortEmbed(record, t) {
     const emoji = '🏆';
 
     const recordType = isImprovement
-        ? 'set a new personal best'
-        : 'set their first time';
+        ? t.embeds.newRecord.newPersonalBest
+        : t.embeds.newRecord.firstRecord;
 
     const embed = new EmbedBuilder()
-        .setTitle(`${emoji} Weekly Short New PB!`)
+        .setTitle(t.embeds.newRecord.title.replace('{emoji}', emoji))
         .setColor(0xFF6B6B)
-        .setDescription(`**${record.username || 'Player'}** (<@${record.discord_id}>) ${recordType}`)
+        .setDescription(t.embeds.newRecord.description
+            .replace('{username}', record.username || 'Player')
+            .replace('{discordId}', record.discord_id)
+            .replace('{recordType}', recordType))
         .setAuthor({ name: 'Trackmania Weekly Shorts', iconURL: TRACKMANIA_ICON_URL })
         .addFields(
-            { name: 'Map', value: `**${record.map_name || 'Unknown Map'}**`, inline: false },
-            { name: 'Current Position', value: `**#${record.position}**`, inline: true }
+            { name: t.embeds.newRecord.map, value: `**${record.map_name || 'Unknown Map'}**`, inline: false },
+            { name: t.embeds.newRecord.worldPosition, value: `**#${record.position}**`, inline: true }
         );
 
     if (record.thumbnail_url && record.thumbnail_url.startsWith('http')) {
@@ -479,13 +423,21 @@ export function createWeeklyShortEmbed(record, t) {
         }
 
         embed.addFields(
-            { name: 'Previous Position', value: `#${record.previous_position}`, inline: true },
-            { name: 'Position Change', value: changeText, inline: true }
+            { name: t.embeds.newRecord.previous, value: `#${record.previous_position}`, inline: true },
+            { name: t.embeds.newRecord.worldPosition, value: changeText, inline: true }
         );
     }
 
-    embed.setTimestamp(new Date())
-        .setFooter({ text: 'New personal best time set!' });
+    const now = new Date();
+    const dateStr = now.toLocaleDateString();
+    const timeStr = now.toLocaleTimeString();
+
+    embed.setTimestamp(now)
+        .setFooter({
+            text: t.embeds.newRecord.footer
+                .replace('{date}', dateStr)
+                .replace('{time}', timeStr)
+        });
 
     return embed;
 }
@@ -542,6 +494,8 @@ export async function checkWeeklyShorts(client, defaultMaxPosition = 10000) {
 
         log(`Using minimum position threshold: ${lowestMinPosition} (from guild settings)`);
 
+        const maxPositionToCheck = lowestMinPosition;
+
         for (let i = 0; i < mapList.length; i++) {
             const map = mapList[i];
             const mapInfo = campaign.playlist[i];
@@ -566,19 +520,17 @@ export async function checkWeeklyShorts(client, defaultMaxPosition = 10000) {
                 headers: { Authorization: `nadeo_v1 t=${coreToken}` }
             });
 
+            const recordsData = recordResponse.data && Array.isArray(recordResponse.data) ? recordResponse.data : [];
+            log(`Retrieved ${recordsData.length} records for map ${mapName}`);
+
             const currentRecords = {};
             const playersWithNewRecords = [];
 
-            if (recordResponse.data && Array.isArray(recordResponse.data)) {
-                for (const record of recordResponse.data) {
+            if (recordsData && recordsData.length > 0) {
+                for (const record of recordsData) {
                     if (!record.removed) {
                         const accountId = record.accountId;
-                        const timestamp = record.timestamp ? new Date(record.timestamp).getTime() : 0;
-
-                        currentRecords[accountId] = {
-                            timestamp,
-                            time: record.recordScore?.time || record.time
-                        };
+                        const recordTimestamp = record.timestamp ? new Date(record.timestamp).getTime() : 0;
 
                         let player = null;
                         for (const [guildId, guildPlayers] of guildPlayerMap) {
@@ -586,28 +538,103 @@ export async function checkWeeklyShorts(client, defaultMaxPosition = 10000) {
                             if (player) break;
                         }
 
-                        if (player) {
-                            const existingRecord = await db.get(
-                                'SELECT timestamp FROM weekly_short_records WHERE player_id = ? AND map_id = ?',
-                                [player.id, dbMapId]
-                            );
-
-                            if (!existingRecord || timestamp > existingRecord.timestamp) {
-                                playersWithNewRecords.push(accountId);
-                                log(`Player ${accountId} has a new/improved record (timestamp: ${timestamp})`);
-                            }
+                        if (!player) {
+                            log(`Unknown player with accountId ${accountId}`, 'warn');
+                            continue;
                         }
+
+                        const existingDbRecord = await db.get(
+                            `SELECT id, position, timestamp FROM weekly_short_records 
+                             WHERE player_id = ? AND map_id = ?`,
+                            [player.id, dbMapId]
+                        );
+
+                        if (existingDbRecord && existingDbRecord.timestamp >= recordTimestamp) {
+                            log(`Record for ${accountId} on map ${mapPosition + 1} already exists with same or newer timestamp - skipping`);
+                            continue;
+                        }
+
+                        let registeredAt;
+                        if (player.registered_at) {
+                            if (typeof player.registered_at === 'string') {
+                                const utcString = player.registered_at.endsWith('Z') ?
+                                    player.registered_at :
+                                    player.registered_at.replace(' ', 'T') + 'Z';
+                                registeredAt = new Date(utcString);
+                            } else if (player.registered_at instanceof Date) {
+                                registeredAt = new Date(Date.UTC(
+                                    player.registered_at.getUTCFullYear(),
+                                    player.registered_at.getUTCMonth(),
+                                    player.registered_at.getUTCDate(),
+                                    player.registered_at.getUTCHours(),
+                                    player.registered_at.getUTCMinutes(),
+                                    player.registered_at.getUTCSeconds(),
+                                    player.registered_at.getUTCMilliseconds()
+                                ));
+                            } else {
+                                registeredAt = new Date(player.registered_at);
+                            }
+                        } else {
+                            registeredAt = new Date();
+                        }
+
+                        const recordDate = new Date(recordTimestamp);
+                        const existedBeforeRegistration = recordDate < registeredAt;
+
+                        log(`Timestamp comparison for ${accountId}: ${recordDate.toISOString()} < ${registeredAt.toISOString()} = ${existedBeforeRegistration}`);
+
+                        if (existedBeforeRegistration) {
+                            let recordId = existingDbRecord?.id;
+
+                            if (!existingDbRecord) {
+                                const result = await db.run(
+                                    `INSERT INTO weekly_short_records (player_id, map_id, position, timestamp, announced) 
+                                     VALUES (?, ?, ?, ?, 0)`,
+                                    [player.id, dbMapId, null, recordTimestamp]
+                                );
+                                recordId = result.lastID;
+
+                                await db.run(
+                                    `INSERT INTO weekly_short_history (player_id, map_id, position, previous_position, timestamp) 
+                                     VALUES (?, ?, ?, ?, ?)`,
+                                    [player.id, dbMapId, null, null, recordTimestamp]
+                                );
+
+                                log(`Added pre-existing record for ${accountId} on map ${mapPosition + 1} without position`);
+                            }
+
+                            for (const [guildId, _] of guilds) {
+                                await db.run(
+                                    `INSERT OR IGNORE INTO guild_announcement_status 
+                                     (guild_id, weekly_short_record_id, ineligible_for_announcement, existed_before_registration) 
+                                     VALUES (?, ?, 1, 1)`,
+                                    [guildId, recordId]
+                                );
+                            }
+
+                            log(`Marked pre-existing record for ${accountId} on map ${mapPosition + 1} as ineligible for all guilds`);
+                            continue;
+                        }
+
+                        playersWithNewRecords.push(accountId);
+
+                        currentRecords[accountId] = {
+                            timestamp: recordTimestamp,
+                            time: record.recordScore?.time || record.time
+                        };
+
+                        log(`Player ${accountId} has a new/improved record set after registration (timestamp: ${recordTimestamp})`);
                     }
                 }
             }
 
             if (playersWithNewRecords.length === 0) {
-                log(`No new records on map ${mapPosition + 1} - skipping position checks`);
+                log(`No eligible new records on map ${mapPosition + 1} - skipping position checks`);
                 continue;
             }
 
-            log(`Fetching positions for ${playersWithNewRecords.length} players with new records (max position: ${lowestMinPosition})`);
-            const playerPositions = await getWeeklyShortPlayerPositions(mapUid, seasonUid, playersWithNewRecords, lowestMinPosition);
+            log(`Fetching positions for ${playersWithNewRecords.length} eligible new records (max position: ${maxPositionToCheck})`);
+            const playerPositions = await getWeeklyShortPlayerPositions(mapUid, seasonUid, playersWithNewRecords, maxPositionToCheck);
 
             for (const accountId of playersWithNewRecords) {
                 let player = null;
@@ -615,21 +642,69 @@ export async function checkWeeklyShorts(client, defaultMaxPosition = 10000) {
                     player = guildPlayers.find(p => p.account_id === accountId);
                     if (player) break;
                 }
-
-                if (!player || !playerPositions[accountId]) continue;
-
-                const position = playerPositions[accountId].position;
                 const timestamp = currentRecords[accountId].timestamp;
+                const playerPosition = playerPositions[accountId];
 
-                log(`Processing improved record: ${accountId} on map ${mapPosition + 1}: #${position} (timestamp: ${timestamp})`);
-                const result = await updateWeeklyShortRecord(db, player.id, dbMapId, position, timestamp);
+                const existingDbRecord = await db.get(
+                    `SELECT id, position, timestamp FROM weekly_short_records 
+                     WHERE player_id = ? AND map_id = ?`,
+                    [player.id, dbMapId]
+                );
 
-                if (result.isFirstRecord || result.improved) {
-                    if (result.isFirstRecord) {
-                        log(`First record for ${accountId} on map ${mapPosition + 1}: #${position}`);
-                    } else {
-                        log(`New PB for ${accountId} on map ${mapPosition + 1}: #${position} (previous: #${result.previousPosition})`);
+                const position = playerPosition ? playerPosition.position : null;
+
+                if (!playerPosition) {
+                    log(`Position not found for valid record by ${accountId} on map ${mapPosition + 1}, using fallback position ${position}`);
+                }
+
+                if (existingDbRecord) {
+                    const previousPosition = existingDbRecord.position;
+
+                    await db.run(
+                        `INSERT INTO weekly_short_history (player_id, map_id, position, previous_position, timestamp) 
+                         VALUES (?, ?, ?, ?, ?)`,
+                        [player.id, dbMapId, position, previousPosition, timestamp]
+                    );
+
+                    await db.run(
+                        `UPDATE weekly_short_records 
+                         SET position = ?, timestamp = ?, recorded_at = datetime('now'), announced = 0
+                         WHERE player_id = ? AND map_id = ?`,
+                        [position, timestamp, player.id, dbMapId]
+                    );
+
+                    log(`Updated record for ${accountId} on map ${mapPosition + 1}: #${position} (previous: #${previousPosition})`);
+                } else {
+                    await db.run(
+                        `INSERT INTO weekly_short_history (player_id, map_id, position, previous_position, timestamp) 
+                         VALUES (?, ?, ?, ?, ?)`,
+                        [player.id, dbMapId, position, null, timestamp]
+                    );
+
+                    await db.run(
+                        `INSERT INTO weekly_short_records (player_id, map_id, position, timestamp, announced) 
+                         VALUES (?, ?, ?, ?, 0)`,
+                        [player.id, dbMapId, position, timestamp]
+                    );
+
+                    log(`Added new record for ${accountId} on map ${mapPosition + 1}: #${position}`);
+                }
+
+                if (position > maxPositionToCheck) {
+                    for (const [guildId, _] of guilds) {
+                        const recordId = existingDbRecord?.id || await db.get(
+                            'SELECT id FROM weekly_short_records WHERE player_id = ? AND map_id = ?',
+                            [player.id, dbMapId]
+                        ).id;
+
+                        await db.run(
+                            `INSERT OR IGNORE INTO guild_announcement_status (guild_id, weekly_short_record_id, ineligible_for_announcement) 
+                             VALUES (?, ?, 1)`,
+                            [guildId, recordId]
+                        );
                     }
+
+                    log(`Position ${position} by ${accountId} exceeds minimum threshold (${maxPositionToCheck}) - marked as ineligible`);
                 }
             }
         }
@@ -653,10 +728,11 @@ export async function checkWeeklyShorts(client, defaultMaxPosition = 10000) {
 /**
  * Gets unannounced weekly short updates from the database
  * @param {Database} db - Database connection
+ * @param {string} guildId - Guild ID to check eligibility for (optional)
  * @returns {Promise<Array>} Array of unannounced records
  */
-async function getUnannouncedWeeklyShorts(db) {
-    const records = await db.all(`
+async function getUnannouncedWeeklyShorts(db, guildId = null) {
+    let query = `
         SELECT 
             r.id as record_id,
             p.discord_id, 
@@ -684,10 +760,26 @@ async function getUnannouncedWeeklyShorts(db) {
                 )
             )
         WHERE 
-            r.announced = 0
+            r.announced = 0`;
+
+    const params = [];
+
+    if (guildId) {
+        query += `
+            AND NOT EXISTS (
+                SELECT 1 FROM guild_announcement_status gas
+                WHERE gas.weekly_short_record_id = r.id 
+                AND gas.guild_id = ?
+                AND (gas.ineligible_for_announcement = 1 OR gas.existed_before_registration = 1)
+            )`;
+        params.push(guildId);
+    }
+
+    query += `
         ORDER BY 
-            r.recorded_at ASC
-    `);
+            r.recorded_at ASC`;
+
+    const records = await db.all(query, params);
 
     if (records.length > 0 && tmOAuthClientId && tmOAuthClientSecret) {
         const accountIdsNeedingNames = [...new Set(
@@ -708,7 +800,7 @@ async function getUnannouncedWeeklyShorts(db) {
                 for (const accountId of accountIdsNeedingNames) {
                     if (displayNames[accountId]) {
                         await db.run(
-                            'UPDATE players SET username = ?, updated_at = CURRENT_TIMESTAMP WHERE account_id = ?',
+                            'UPDATE players SET username = ?, updated_at = datetime(\'now\') WHERE account_id = ?',
                             [displayNames[accountId], accountId]
                         );
                     }
@@ -735,6 +827,11 @@ async function markWeeklyShortsAsAnnounced(db, recordIds) {
         `UPDATE weekly_short_records SET announced = 1 WHERE id IN (${placeholders})`,
         recordIds
     );
+
+    await db.run(
+        `DELETE FROM guild_announcement_status WHERE weekly_short_record_id IN (${placeholders})`,
+        recordIds
+    );
 }
 
 /**
@@ -744,52 +841,74 @@ async function markWeeklyShortsAsAnnounced(db, recordIds) {
  */
 async function announceWeeklyShortUpdates(client, db) {
     try {
-        const records = await getUnannouncedWeeklyShorts(db);
+        const guilds = client.guilds.cache;
+        const allGloballyUnannounced = await getUnannouncedWeeklyShorts(db);
 
-        if (records.length === 0) {
+        if (allGloballyUnannounced.length === 0) {
             log('No new weekly short positions to announce');
             return;
         }
 
-        log(`Found ${records.length} weekly short updates to announce`);
+        log(`Found ${allGloballyUnannounced.length} weekly short updates to process`);
 
-        const guilds = client.guilds.cache;
-        const recordIds = [];
+        const announcedInAnyGuild = new Set();
 
-        for (const record of records) {
-            let announced = false;
+        for (const [guildId, guild] of guilds) {
+            const guildEligibleRecords = await getUnannouncedWeeklyShorts(db, guildId);
 
-            for (const [guildId, guild] of guilds) {
-                const guildSettings = await db.get('SELECT weekly_shorts_channel_id FROM guild_settings WHERE guild_id = ?', guildId);
+            if (guildEligibleRecords.length === 0) {
+                log(`No eligible weekly shorts for guild ${guildId}`);
+                continue;
+            }
 
-                let channel = null;
-                if (guildSettings && guildSettings.weekly_shorts_channel_id) {
-                    channel = client.channels.cache.get(guildSettings.weekly_shorts_channel_id);
-                } else {
-                    const fallbackSettings = await db.get('SELECT records_channel_id FROM guild_settings WHERE guild_id = ?', guildId);
-                    if (fallbackSettings && fallbackSettings.records_channel_id) {
-                        channel = client.channels.cache.get(fallbackSettings.records_channel_id);
-                    }
+            const guildSettings = await db.get('SELECT weekly_shorts_channel_id FROM guild_settings WHERE guild_id = ?', guildId);
+
+            let channel = null;
+            if (guildSettings && guildSettings.weekly_shorts_channel_id) {
+                channel = client.channels.cache.get(guildSettings.weekly_shorts_channel_id);
+            } else {
+                const fallbackSettings = await db.get('SELECT records_channel_id FROM guild_settings WHERE guild_id = ?', guildId);
+                if (fallbackSettings && fallbackSettings.records_channel_id) {
+                    channel = client.channels.cache.get(fallbackSettings.records_channel_id);
                 }
+            }
 
-                if (!channel) {
-                    channel = guild.channels.cache.find(ch => ch.isTextBased() && ch.permissionsFor(guild.members.me)?.has('SendMessages'));
-                }
+            if (!channel) {
+                channel = guild.channels.cache.find(ch => ch.isTextBased() && ch.permissionsFor(guild.members.me)?.has('SendMessages'));
+            }
 
-                if (!channel) continue;
+            if (!channel) {
+                log(`No available channel for guild ${guildId}`);
+                continue;
+            }
 
-                const minPosition = await getMinWorldPosition(guildId);
-                if (record.position && record.position > minPosition) {
-                    log(`Weekly short position by ${record.username} (#${record.position}) does not meet minimum position (top ${minPosition}) for guild ${guildId}`);
+            const maxPositionThreshold = await getMinWorldPosition(guildId);
+            const t = await getTranslations(guildId);
+
+            for (const record of guildEligibleRecords) {
+                if (!record.position) {
+                    log(`Weekly short for ${record.username} has no position, skipping announcement in guild ${guildId}`);
+                    await db.run(
+                        `INSERT OR IGNORE INTO guild_announcement_status (guild_id, weekly_short_record_id, ineligible_for_announcement) 
+                         VALUES (?, ?, 1)`,
+                        [guildId, record.record_id]
+                    );
+                    continue;
+                } else if (record.position > maxPositionThreshold) {
+                    log(`Weekly short position by ${record.username} (#${record.position}) does not meet position threshold (top ${maxPositionThreshold}) for guild ${guildId}`);
+                    await db.run(
+                        `INSERT OR IGNORE INTO guild_announcement_status (guild_id, weekly_short_record_id, ineligible_for_announcement) 
+                         VALUES (?, ?, 1)`,
+                        [guildId, record.record_id]
+                    );
                     continue;
                 }
 
-                const t = await getTranslations(guildId);
                 const embed = createWeeklyShortEmbed(record, t);
 
                 try {
                     await channel.send({ embeds: [embed] });
-                    announced = true;
+                    announcedInAnyGuild.add(record.record_id);
                     log(`Announced weekly short update for ${record.username} in guild ${guildId}`);
                 } catch (sendError) {
                     log(`Failed to send weekly short announcement in guild ${guildId}: ${sendError.message}`, 'error');
@@ -797,13 +916,11 @@ async function announceWeeklyShortUpdates(client, db) {
 
                 await new Promise(r => setTimeout(r, 250));
             }
-
-            if (announced) {
-                recordIds.push(record.record_id);
-            }
         }
 
-        await markWeeklyShortsAsAnnounced(db, recordIds);
+        if (announcedInAnyGuild.size > 0) {
+            await markWeeklyShortsAsAnnounced(db, Array.from(announcedInAnyGuild));
+        }
 
     } catch (error) {
         log(`Error announcing weekly shorts: ${error.message}`, 'error');

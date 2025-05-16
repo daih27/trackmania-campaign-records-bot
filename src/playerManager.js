@@ -53,7 +53,7 @@ export async function registerPlayer(discordId, guildId, accountId, username = n
 
         if (existingPlayer) {
             await db.run(
-                'UPDATE players SET account_id = ?, username = ?, updated_at = CURRENT_TIMESTAMP WHERE discord_id = ? AND guild_id = ?',
+                'UPDATE players SET account_id = ?, username = ?, updated_at = datetime(\'now\') WHERE discord_id = ? AND guild_id = ?',
                 [accountId, username, discordId, guildId]
             );
             log(`Updated player with Discord ID ${discordId} in guild ${guildId}`);
@@ -177,7 +177,7 @@ export async function batchUpdatePlayerDisplayNames() {
             const displayName = displayNames[player.account_id];
             if (displayName) {
                 await db.run(
-                    'UPDATE players SET username = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+                    'UPDATE players SET username = ?, updated_at = datetime(\'now\') WHERE id = ?',
                     [displayName, player.id]
                 );
                 updateCount++;
