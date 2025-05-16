@@ -12,6 +12,17 @@ import { fetchMapInfo } from './recordTracker.js';
 import { getMinWorldPosition } from './guildSettings.js';
 
 /**
+ * Cleans Trackmania formatting tags from a map name
+ * @param {string} mapName - The original map name with formatting tags
+ * @returns {string} Cleaned map name without formatting tags
+ */
+export function cleanMapName(mapName) {
+    if (!mapName) return mapName;
+    const formattingTagsRegex = /(\$[0-9a-fA-F]{3})|(\$[wWtTzZiIoOsSgGnNmM])|(\$[hHlL](\[.*\])?)/g;
+    return mapName.replace(formattingTagsRegex, '');
+}
+
+/**
  * Fetches leaderboard data for a weekly short season filtered by country
  * @param {string} seasonUid - The season UID
  * @param {string} countryCode - The country zone ID
@@ -355,6 +366,12 @@ export async function fetchWeeklyShortLeaderboard(mapUid, seasonUid, length = 10
  */
 export async function storeWeeklyShortMap(db, mapUid, mapId, name, seasonUid, position, thumbnailUrl) {
     try {
+        const cleanedName = cleanMapName(name);
+
+        if (cleanedName !== name) {
+            log(`Cleaned map name: "${name}" -> "${cleanedName}"`);
+        }
+
         const existingMap = await db.get('SELECT id FROM weekly_short_maps WHERE map_uid = ?', mapUid);
 
         if (existingMap) {
@@ -362,14 +379,14 @@ export async function storeWeeklyShortMap(db, mapUid, mapId, name, seasonUid, po
                 `UPDATE weekly_short_maps
                  SET map_id = ?, name = ?, season_uid = ?, position = ?, thumbnail_url = ?, last_checked = CURRENT_TIMESTAMP
                  WHERE map_uid = ?`,
-                [mapId, name, seasonUid, position, thumbnailUrl, mapUid]
+                [mapId, cleanedName, seasonUid, position, thumbnailUrl, mapUid]
             );
             return existingMap.id;
         } else {
             const result = await db.run(
                 `INSERT INTO weekly_short_maps (map_uid, map_id, name, season_uid, position, thumbnail_url)
                  VALUES (?, ?, ?, ?, ?, ?)`,
-                [mapUid, mapId, name, seasonUid, position, thumbnailUrl]
+                [mapUid, mapId, cleanedName, seasonUid, position, thumbnailUrl]
             );
             return result.lastID;
         }
