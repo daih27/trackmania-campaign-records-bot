@@ -480,6 +480,13 @@ export async function checkWeeklyShorts(client, defaultMaxPosition = 10000) {
     try {
         log('Starting weekly shorts check...');
 
+        // Check if any guild has weekly shorts announcements enabled
+        const isAnyEnabled = await import('./guildSettings.js').then(module => module.isAnyWeeklyShortsAnnouncementsEnabled());
+        if (!isAnyEnabled) {
+            log('Weekly shorts announcements are disabled for all guilds, skipping weekly shorts check');
+            return;
+        }
+        
         const guilds = client.guilds.cache;
         const guildPlayerMap = new Map();
         const allAccountIds = new Set();
@@ -881,6 +888,13 @@ async function announceWeeklyShortUpdates(client, db) {
         const announcedInAnyGuild = new Set();
 
         for (const [guildId, guild] of guilds) {
+            // Check if weekly shorts announcements are enabled for this guild
+            const isEnabled = await import('./guildSettings.js').then(module => module.getWeeklyShortsAnnouncementsStatus(guildId));
+            if (!isEnabled) {
+                log(`Weekly shorts announcements are disabled for guild ${guildId}`);
+                continue;
+            }
+            
             const guildEligibleRecords = await getUnannouncedWeeklyShorts(db, guildId);
 
             if (guildEligibleRecords.length === 0) {

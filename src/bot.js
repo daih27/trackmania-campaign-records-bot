@@ -7,7 +7,7 @@ import { getDisplayNames } from './oauth.js';
 import { formatTime, log } from './utils.js';
 import { getDb } from './db.js';
 import { getTranslations, setLanguage, getAvailableLanguages, formatString } from './localization/index.js';
-import { setDefaultCountry, setAnnouncementChannel, setWeeklyShortsAnnouncementChannel, setMinWorldPosition } from './guildSettings.js';
+import { setDefaultCountry, setAnnouncementChannel, setWeeklyShortsAnnouncementChannel, setMinWorldPosition, toggleCampaignAnnouncements, toggleWeeklyShortsAnnouncements, getCampaignAnnouncementsStatus, getWeeklyShortsAnnouncementsStatus } from './guildSettings.js';
 import { getZoneName, getAvailableCountries } from './config/zones.js';
 import { getDefaultCountry } from './guildSettings.js';
 import {
@@ -125,6 +125,22 @@ async function getCommands(t) {
                     .setRequired(true)
                     .setMinValue(1)
                     .setMaxValue(100000)),
+            
+        new SlashCommandBuilder()
+            .setName('togglecampaignannouncements')
+            .setDescription(t.commands.togglecampaignannouncements || 'Toggle campaign record announcements')
+            .addBooleanOption(option =>
+                option.setName('enabled')
+                    .setDescription(t.commands.togglecampaignannouncementsOption || 'Enable or disable campaign announcements')
+                    .setRequired(true)),
+                    
+        new SlashCommandBuilder()
+            .setName('toggleweeklyshortsannouncements')
+            .setDescription(t.commands.toggleweeklyshortsannouncements || 'Toggle weekly shorts announcements')
+            .addBooleanOption(option =>
+                option.setName('enabled')
+                    .setDescription(t.commands.toggleweeklyshortsannouncementsOption || 'Enable or disable weekly shorts announcements')
+                    .setRequired(true)),
     ].map(command => command.toJSON());
 }
 
@@ -357,6 +373,14 @@ async function handleHelp(interaction) {
                 value: t.embeds.help.setminpositionDesc || 'Set minimum world position to announce records (Admin/Mod only)'
             },
             {
+                name: t.embeds.help.togglecampaignannouncements || '/togglecampaignannouncements',
+                value: t.embeds.help.togglecampaignannouncementsDesc || 'Enable or disable campaign record announcements (Admin/Mod only)'
+            },
+            {
+                name: t.embeds.help.toggleweeklyshortsannouncements || '/toggleweeklyshortsannouncements',
+                value: t.embeds.help.toggleweeklyshortsannouncementsDesc || 'Enable or disable weekly shorts announcements (Admin/Mod only)'
+            },
+            {
                 name: t.embeds.help.updateDisplayNames || '/update-display-names',
                 value: t.embeds.help.updateDisplayNamesDesc || 'Update all player display names from Trackmania API (Admin only)'
             }
@@ -447,6 +471,12 @@ async function handleInteraction(interaction) {
                     break;
                 case 'setminposition':
                     await handleSetMinPosition(interaction);
+                    break;
+                case 'togglecampaignannouncements':
+                    await handleToggleCampaignAnnouncements(interaction);
+                    break;
+                case 'toggleweeklyshortsannouncements':
+                    await handleToggleWeeklyShortsAnnouncements(interaction);
                     break;
                 default:
                     await interaction.reply(t.responses.error.unknownCommand);
@@ -686,6 +716,114 @@ async function handleSetMinPosition(interaction) {
 }
 
 import handleLeaderboardModule from './handleLeaderboard.js';
+
+/**
+ * Handles the /togglecampaignannouncements command to enable/disable campaign announcements
+ * Admin/Moderator-only command
+ * @param {Interaction} interaction - Discord interaction object
+ */
+async function handleToggleCampaignAnnouncements(interaction) {
+    const t = await getTranslations(interaction.guildId);
+
+    if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator) &&
+        !interaction.member.permissions.has(PermissionFlagsBits.ModerateMembers)) {
+        return await interaction.reply({
+            content: t.responses.togglecampaignannouncements?.noPermission ||
+                'You need administrator or moderator permissions to use this command.',
+            ephemeral: true
+        });
+    }
+
+    try {
+        await interaction.deferReply();
+        const enabled = interaction.options.getBoolean('enabled');
+        const guildId = interaction.guildId;
+
+        const currentStatus = await getCampaignAnnouncementsStatus(guildId);
+        if (currentStatus === enabled) {
+            const statusText = enabled ? 'enabled' : 'disabled';
+            return await interaction.editReply(
+                t.responses.togglecampaignannouncements?.alreadySet ||
+                `Campaign announcements are already ${statusText} for this server.`
+            );
+        }
+
+        const result = await toggleCampaignAnnouncements(guildId, enabled);
+
+        if (result) {
+            const statusText = enabled ? 'enabled' : 'disabled';
+            await interaction.editReply(
+                t.responses.togglecampaignannouncements?.success ||
+                `✅ Campaign announcements have been ${statusText} for this server.`
+            );
+        } else {
+            await interaction.editReply(
+                t.responses.togglecampaignannouncements?.error ||
+                '❌ Failed to update campaign announcement settings.'
+            );
+        }
+    } catch (error) {
+        log(`Error in togglecampaignannouncements command: ${error.message}`, 'error');
+        await interaction.editReply(
+            t.responses.togglecampaignannouncements?.error ||
+            '❌ An error occurred while updating campaign announcement settings.'
+        );
+    }
+}
+
+/**
+ * Handles the /toggleweeklyshortsannouncements command to enable/disable weekly shorts announcements
+ * Admin/Moderator-only command
+ * @param {Interaction} interaction - Discord interaction object
+ */
+async function handleToggleWeeklyShortsAnnouncements(interaction) {
+    const t = await getTranslations(interaction.guildId);
+
+    if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator) &&
+        !interaction.member.permissions.has(PermissionFlagsBits.ModerateMembers)) {
+        return await interaction.reply({
+            content: t.responses.toggleweeklyshortsannouncements?.noPermission ||
+                'You need administrator or moderator permissions to use this command.',
+            ephemeral: true
+        });
+    }
+
+    try {
+        await interaction.deferReply();
+        const enabled = interaction.options.getBoolean('enabled');
+        const guildId = interaction.guildId;
+
+        const currentStatus = await getWeeklyShortsAnnouncementsStatus(guildId);
+        if (currentStatus === enabled) {
+            const statusText = enabled ? 'enabled' : 'disabled';
+            return await interaction.editReply(
+                t.responses.toggleweeklyshortsannouncements?.alreadySet ||
+                `Weekly shorts announcements are already ${statusText} for this server.`
+            );
+        }
+
+        const result = await toggleWeeklyShortsAnnouncements(guildId, enabled);
+
+        if (result) {
+            const statusText = enabled ? 'enabled' : 'disabled';
+            await interaction.editReply(
+                t.responses.toggleweeklyshortsannouncements?.success ||
+                `✅ Weekly shorts announcements have been ${statusText} for this server.`
+            );
+        } else {
+            await interaction.editReply(
+                t.responses.toggleweeklyshortsannouncements?.error ||
+                '❌ Failed to update weekly shorts announcement settings.'
+            );
+        }
+    } catch (error) {
+        log(`Error in toggleweeklyshortsannouncements command: ${error.message}`, 'error');
+        await interaction.editReply(
+            t.responses.toggleweeklyshortsannouncements?.error ||
+            '❌ An error occurred while updating weekly shorts announcement settings.'
+        );
+    }
+}
 
 /**
  * Handles the /weeklyshortsleaderboard command

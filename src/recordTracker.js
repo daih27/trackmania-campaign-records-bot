@@ -584,6 +584,12 @@ export async function checkRecords(client) {
     try {
         log('Starting record check...');
 
+        const isAnyEnabled = await import('./guildSettings.js').then(module => module.isAnyCampaignAnnouncementsEnabled());
+        if (!isAnyEnabled) {
+            log('Campaign announcements are disabled for all guilds, skipping record check');
+            return;
+        }
+
         const guilds = client.guilds.cache;
         const guildPlayerMap = new Map();
         const allAccountIds = new Set();
@@ -961,6 +967,12 @@ async function announceNewRecords(client, db) {
         const announcedInAnyGuild = new Set();
 
         for (const [guildId, guild] of guilds) {
+            const isEnabled = await import('./guildSettings.js').then(module => module.getCampaignAnnouncementsStatus(guildId));
+            if (!isEnabled) {
+                log(`Campaign announcements are disabled for guild ${guildId}`);
+                continue;
+            }
+            
             const guildEligibleRecords = await getUnannouncedRecords(db, guildId);
 
             if (guildEligibleRecords.length === 0) {

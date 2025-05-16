@@ -189,3 +189,155 @@ export async function setMinWorldPosition(guildId, position) {
         return false;
     }
 }
+
+/**
+ * Toggle campaign announcements for a guild
+ * @param {string} guildId - Discord guild ID
+ * @param {boolean} enabled - Whether to enable or disable campaign announcements
+ * @returns {Promise<boolean>} - Success status
+ */
+export async function toggleCampaignAnnouncements(guildId, enabled) {
+    try {
+        const db = await getDb();
+
+        const guild = await db.get('SELECT id FROM guild_settings WHERE guild_id = ?', guildId);
+
+        if (guild) {
+            await db.run(
+                'UPDATE guild_settings SET campaign_announcements_enabled = ?, updated_at = CURRENT_TIMESTAMP WHERE guild_id = ?',
+                [enabled ? 1 : 0, guildId]
+            );
+        } else {
+            await db.run(
+                'INSERT INTO guild_settings (guild_id, campaign_announcements_enabled) VALUES (?, ?)',
+                [guildId, enabled ? 1 : 0]
+            );
+        }
+
+        return true;
+    } catch (error) {
+        log(`Error toggling campaign announcements: ${error.message}`, 'error');
+        return false;
+    }
+}
+
+/**
+ * Toggle weekly shorts announcements for a guild
+ * @param {string} guildId - Discord guild ID
+ * @param {boolean} enabled - Whether to enable or disable weekly shorts announcements
+ * @returns {Promise<boolean>} - Success status
+ */
+export async function toggleWeeklyShortsAnnouncements(guildId, enabled) {
+    try {
+        const db = await getDb();
+
+        const guild = await db.get('SELECT id FROM guild_settings WHERE guild_id = ?', guildId);
+
+        if (guild) {
+            await db.run(
+                'UPDATE guild_settings SET weekly_shorts_announcements_enabled = ?, updated_at = CURRENT_TIMESTAMP WHERE guild_id = ?',
+                [enabled ? 1 : 0, guildId]
+            );
+        } else {
+            await db.run(
+                'INSERT INTO guild_settings (guild_id, weekly_shorts_announcements_enabled) VALUES (?, ?)',
+                [guildId, enabled ? 1 : 0]
+            );
+        }
+
+        return true;
+    } catch (error) {
+        log(`Error toggling weekly shorts announcements: ${error.message}`, 'error');
+        return false;
+    }
+}
+
+/**
+ * Get campaign announcements status for a guild
+ * @param {string} guildId - Discord guild ID
+ * @returns {Promise<boolean>} - Whether campaign announcements are enabled
+ */
+export async function getCampaignAnnouncementsStatus(guildId) {
+    try {
+        const db = await getDb();
+
+        const guild = await db.get('SELECT campaign_announcements_enabled FROM guild_settings WHERE guild_id = ?', guildId);
+
+        if (!guild) {
+            await db.run(
+                'INSERT INTO guild_settings (guild_id, campaign_announcements_enabled) VALUES (?, 1)',
+                [guildId]
+            );
+            return true;
+        }
+
+        return guild.campaign_announcements_enabled === 1;
+    } catch (error) {
+        log(`Error getting campaign announcements status: ${error.message}`, 'error');
+        return true;
+    }
+}
+
+/**
+ * Get weekly shorts announcements status for a guild
+ * @param {string} guildId - Discord guild ID
+ * @returns {Promise<boolean>} - Whether weekly shorts announcements are enabled
+ */
+export async function getWeeklyShortsAnnouncementsStatus(guildId) {
+    try {
+        const db = await getDb();
+
+        const guild = await db.get('SELECT weekly_shorts_announcements_enabled FROM guild_settings WHERE guild_id = ?', guildId);
+
+        if (!guild) {
+            await db.run(
+                'INSERT INTO guild_settings (guild_id, weekly_shorts_announcements_enabled) VALUES (?, 1)',
+                [guildId]
+            );
+            return true;
+        }
+
+        return guild.weekly_shorts_announcements_enabled === 1;
+    } catch (error) {
+        log(`Error getting weekly shorts announcements status: ${error.message}`, 'error');
+        return true;
+    }
+}
+
+/**
+ * Check if any guild has campaign announcements enabled
+ * @returns {Promise<boolean>} - Whether any guild has campaign announcements enabled
+ */
+export async function isAnyCampaignAnnouncementsEnabled() {
+    try {
+        const db = await getDb();
+
+        const result = await db.get(
+            'SELECT COUNT(*) as count FROM guild_settings WHERE campaign_announcements_enabled = 1'
+        );
+
+        return result && result.count > 0;
+    } catch (error) {
+        log(`Error checking if any campaign announcements are enabled: ${error.message}`, 'error');
+        return true;
+    }
+}
+
+/**
+ * Check if any guild has weekly shorts announcements enabled
+ * @returns {Promise<boolean>} - Whether any guild has weekly shorts announcements enabled
+ */
+export async function isAnyWeeklyShortsAnnouncementsEnabled() {
+    try {
+        const db = await getDb();
+
+        const result = await db.get(
+            'SELECT COUNT(*) as count FROM guild_settings WHERE weekly_shorts_announcements_enabled = 1'
+        );
+
+        return result && result.count > 0;
+    } catch (error) {
+        log(`Error checking if any weekly shorts announcements are enabled: ${error.message}`, 'error');
+        return true;
+    }
+}

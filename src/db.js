@@ -90,6 +90,8 @@ export async function initDatabase() {
       weekly_shorts_channel_id TEXT,
       default_zone_id TEXT,
       min_world_position INTEGER DEFAULT 5000,
+      campaign_announcements_enabled BOOLEAN DEFAULT 1,
+      weekly_shorts_announcements_enabled BOOLEAN DEFAULT 1,
       created_at TIMESTAMP DEFAULT (datetime('now')),
       updated_at TIMESTAMP DEFAULT (datetime('now'))
     );
