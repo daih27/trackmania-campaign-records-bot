@@ -12,6 +12,21 @@ import { fetchMapInfo } from './recordTracker.js';
 import { getMinWorldPosition } from './guildSettings.js';
 
 /**
+ * Builds SQL parameters array based on which values are null
+ * @param {Array} prefixParams - Parameters to include at the start
+ * @param {*} param1 - First parameter which might be null
+ * @param {*} param2 - Second parameter which might be null
+ * @param {Array} suffixParams - Parameters to include at the end
+ * @returns {Array} - Array of parameters with nulls filtered out
+ */
+function buildSqlParams(prefixParams = [], param1, param2, suffixParams = []) {
+    const params = [...prefixParams];
+    if (param1 !== null) params.push(param1);
+    if (param2 !== null) params.push(param2);
+    return [...params, ...suffixParams];
+}
+
+/**
  * Cleans Trackmania formatting tags from a map name
  * @param {string} mapName - The original map name with formatting tags
  * @returns {string} Cleaned map name without formatting tags
@@ -414,7 +429,7 @@ export async function storeWeeklyShortMap(db, mapUid, mapId, name, seasonUid, po
  * @returns {EmbedBuilder} Discord embed for the announcement
  */
 export function createWeeklyShortEmbed(record, t) {
-    const isImprovement = record.previous_position !== null;
+    const isImprovement = record.previous_position !== undefined;
     const emoji = '🏆';
 
     const recordType = isImprovement
@@ -431,14 +446,14 @@ export function createWeeklyShortEmbed(record, t) {
         .setAuthor({ name: 'Trackmania Weekly Shorts', iconURL: TRACKMANIA_ICON_URL })
         .addFields(
             { name: t.embeds.newRecord.map, value: `**${cleanMapName(record.map_name) || 'Unknown Map'}**`, inline: false },
-            { name: t.embeds.newRecord.worldPosition, value: `**#${record.position}**`, inline: true }
+            { name: t.embeds.newRecord.worldPosition, value: record.position === null ? "*Not ranked*" : `**#${record.position}**`, inline: true }
         );
 
     if (record.thumbnail_url && record.thumbnail_url.startsWith('http')) {
         embed.setThumbnail(record.thumbnail_url);
     }
 
-    if (record.previous_position) {
+    if (isImprovement) {
         const positionChange = record.previous_position - record.position;
         let changeText;
         if (positionChange > 0) {
@@ -480,13 +495,12 @@ export async function checkWeeklyShorts(client, defaultMaxPosition = 10000) {
     try {
         log('Starting weekly shorts check...');
 
-        // Check if any guild has weekly shorts announcements enabled
         const isAnyEnabled = await import('./guildSettings.js').then(module => module.isAnyWeeklyShortsAnnouncementsEnabled());
         if (!isAnyEnabled) {
             log('Weekly shorts announcements are disabled for all guilds, skipping weekly shorts check');
             return;
         }
-        
+
         const guilds = client.guilds.cache;
         const guildPlayerMap = new Map();
         const allAccountIds = new Set();
@@ -696,32 +710,32 @@ export async function checkWeeklyShorts(client, defaultMaxPosition = 10000) {
 
                     await db.run(
                         `INSERT INTO weekly_short_history (player_id, map_id, position, previous_position, timestamp) 
-                         VALUES (?, ?, ?, ?, ?)`,
-                        [player.id, dbMapId, position, previousPosition, timestamp]
+                         VALUES (?, ?, ${position === null ? 'NULL' : '?'}, ${previousPosition === null ? 'NULL' : '?'}, ?)`,
+                        buildSqlParams([player.id, dbMapId], position, previousPosition, [timestamp])
                     );
 
                     await db.run(
                         `UPDATE weekly_short_records 
-                         SET position = ?, timestamp = ?, recorded_at = datetime('now'), announced = 0
+                         SET position = ${position === null ? 'NULL' : '?'}, timestamp = ?, recorded_at = datetime('now'), announced = 0
                          WHERE player_id = ? AND map_id = ?`,
-                        [position, timestamp, player.id, dbMapId]
+                        position === null ? [timestamp, player.id, dbMapId] : [position, timestamp, player.id, dbMapId]
                     );
 
-                    log(`Updated record for ${accountId} on map ${mapPosition + 1}: #${position} (previous: #${previousPosition})`);
+                    log(`Updated record for ${accountId} on map ${mapPosition + 1}: #${position === null ? 'null' : position} (previous: #${previousPosition === null ? 'null' : previousPosition})`);
                 } else {
                     await db.run(
                         `INSERT INTO weekly_short_history (player_id, map_id, position, previous_position, timestamp) 
-                         VALUES (?, ?, ?, ?, ?)`,
-                        [player.id, dbMapId, position, null, timestamp]
+                         VALUES (?, ?, ${position === null ? 'NULL' : '?'}, NULL, ?)`,
+                        position === null ? [player.id, dbMapId, timestamp] : [player.id, dbMapId, position, timestamp]
                     );
 
                     await db.run(
                         `INSERT INTO weekly_short_records (player_id, map_id, position, timestamp, announced) 
-                         VALUES (?, ?, ?, ?, 0)`,
-                        [player.id, dbMapId, position, timestamp]
+                         VALUES (?, ?, ${position === null ? 'NULL' : '?'}, ?, 0)`,
+                        position === null ? [player.id, dbMapId, timestamp] : [player.id, dbMapId, position, timestamp]
                     );
 
-                    log(`Added new record for ${accountId} on map ${mapPosition + 1}: #${position}`);
+                    log(`Added new record for ${accountId} on map ${mapPosition + 1}: #${position === null ? 'null' : position}`);
                 }
 
                 if (position > maxPositionToCheck) {
@@ -888,13 +902,12 @@ async function announceWeeklyShortUpdates(client, db) {
         const announcedInAnyGuild = new Set();
 
         for (const [guildId, guild] of guilds) {
-            // Check if weekly shorts announcements are enabled for this guild
             const isEnabled = await import('./guildSettings.js').then(module => module.getWeeklyShortsAnnouncementsStatus(guildId));
             if (!isEnabled) {
                 log(`Weekly shorts announcements are disabled for guild ${guildId}`);
                 continue;
             }
-            
+
             const guildEligibleRecords = await getUnannouncedWeeklyShorts(db, guildId);
 
             if (guildEligibleRecords.length === 0) {
@@ -927,15 +940,15 @@ async function announceWeeklyShortUpdates(client, db) {
             const t = await getTranslations(guildId);
 
             for (const record of guildEligibleRecords) {
-                if (!record.position) {
-                    log(`Weekly short for ${record.username} has no position, skipping announcement in guild ${guildId}`);
+                if (record.position === undefined) {
+                    log(`Weekly short for ${record.username} has undefined position, skipping announcement in guild ${guildId}`);
                     await db.run(
                         `INSERT OR IGNORE INTO guild_announcement_status (guild_id, weekly_short_record_id, ineligible_for_announcement) 
                          VALUES (?, ?, 1)`,
                         [guildId, record.record_id]
                     );
                     continue;
-                } else if (record.position > maxPositionThreshold) {
+                } else if (record.position !== null && record.position > maxPositionThreshold) {
                     log(`Weekly short position by ${record.username} (#${record.position}) does not meet position threshold (top ${maxPositionThreshold}) for guild ${guildId}`);
                     await db.run(
                         `INSERT OR IGNORE INTO guild_announcement_status (guild_id, weekly_short_record_id, ineligible_for_announcement) 
