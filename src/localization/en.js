@@ -24,7 +24,11 @@ export default {
         weeklyshortsleaderboardOption: 'Optional: filter by map name',
         weeklyshortsleaderboardCountryOption: 'Select a country',
         setminposition: 'Set the minimum world position to announce records',
-        setminpositionOption: 'Minimum world position (e.g. 5000)'
+        setminpositionOption: 'Minimum world position (e.g. 5000)',
+        togglecampaignannouncements: 'Toggle campaign record announcements',
+        togglecampaignannouncementsOption: 'Enable or disable campaign announcements',
+        toggleweeklyshortsannouncements: 'Toggle weekly shorts announcements',
+        toggleweeklyshortsannouncementsOption: 'Enable or disable weekly shorts announcements'
     },
 
     // Command responses
@@ -86,6 +90,22 @@ export default {
             changed: '✅ Records will now only be announced for world positions within the top {position}',
             error: '❌ Failed to set the minimum world position.'
         },
+        togglecampaignannouncements: {
+            noPermission: '❌ You need administrator or moderator permissions to use this command.',
+            success: '✅ Campaign announcements have been {status} for this server.',
+            error: '❌ Failed to update campaign announcement settings.',
+            alreadySet: 'Campaign announcements are already {status} for this server.',
+            enabledStatus: 'enabled',
+            disabledStatus: 'disabled'
+        },
+        toggleweeklyshortsannouncements: {
+            noPermission: '❌ You need administrator or moderator permissions to use this command.',
+            success: '✅ Weekly shorts announcements have been {status} for this server.',
+            error: '❌ Failed to update weekly shorts announcement settings.',
+            alreadySet: 'Weekly shorts announcements are already {status} for this server.',
+            enabledStatus: 'enabled',
+            disabledStatus: 'disabled'
+        },
         error: {
             unknown: 'An error occurred while processing this command.',
             unknownCommand: 'Unknown command.'
@@ -143,6 +163,10 @@ export default {
             setweeklyshortschannelDesc: 'Set the channel for weekly shorts announcements (admin/mod only)',
             setminposition: '🎯 /setminposition',
             setminpositionDesc: 'Set minimum world position to announce records (admin/mod only)',
+            togglecampaignannouncements: '🔔 /togglecampaignannouncements',
+            togglecampaignannouncementsDesc: 'Enable or disable campaign record announcements (admin/mod only)',
+            toggleweeklyshortsannouncements: '🔔 /toggleweeklyshortsannouncements',
+            toggleweeklyshortsannouncementsDesc: 'Enable or disable weekly shorts announcements (admin/mod only)',
             footer: 'Records are checked automatically'
         },
         newRecord: {
@@ -154,7 +178,11 @@ export default {
             time: '⏱️ Time',
             worldPosition: '🌍 World Position',
             previous: '⏮️ Previous',
-            footer: 'Record set on {date} at {time}'
+            footer: 'Record set on {date} at {time}',
+            places: 'places',
+            samePosition: 'Same position',
+            improved: '↑ {count} places',
+            worsened: '↓ {count} places'
         }
     },
 

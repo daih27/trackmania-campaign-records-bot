@@ -125,7 +125,7 @@ async function getCommands(t) {
                     .setRequired(true)
                     .setMinValue(1)
                     .setMaxValue(100000)),
-            
+
         new SlashCommandBuilder()
             .setName('togglecampaignannouncements')
             .setDescription(t.commands.togglecampaignannouncements || 'Toggle campaign record announcements')
@@ -133,7 +133,7 @@ async function getCommands(t) {
                 option.setName('enabled')
                     .setDescription(t.commands.togglecampaignannouncementsOption || 'Enable or disable campaign announcements')
                     .setRequired(true)),
-                    
+
         new SlashCommandBuilder()
             .setName('toggleweeklyshortsannouncements')
             .setDescription(t.commands.toggleweeklyshortsannouncements || 'Toggle weekly shorts announcements')
@@ -341,16 +341,12 @@ async function handleHelp(interaction) {
                 value: t.embeds.help.leaderboardDesc
             },
             {
-                name: t.embeds.help.weeklyshortsleaderboard || '/weeklyshortsleaderboard',
-                value: t.embeds.help.weeklyshortsleaderboardDesc || 'Show weekly shorts leaderboard (overall or by map)'
+                name: t.embeds.help.weeklyshortsleaderboard,
+                value: t.embeds.help.weeklyshortsleaderboardDesc
             },
             {
                 name: t.embeds.help.help,
                 value: t.embeds.help.helpDesc
-            },
-            {
-                name: t.embeds.help.testAnnouncement,
-                value: t.embeds.help.testAnnouncementDesc
             },
             {
                 name: t.embeds.help.language,
@@ -361,29 +357,25 @@ async function handleHelp(interaction) {
                 value: t.embeds.help.setcountryDesc
             },
             {
-                name: t.embeds.help.setchannel || '/setchannel',
-                value: t.embeds.help.setchannelDesc || 'Set the channel for record announcements (Admin/Mod only)'
+                name: t.embeds.help.setchannel,
+                value: t.embeds.help.setchannelDesc
             },
             {
-                name: t.embeds.help.setweeklyshortschannel || '/setweeklyshortschannel',
-                value: t.embeds.help.setweeklyshortschannelDesc || 'Set the channel for weekly shorts announcements (Admin/Mod only)'
+                name: t.embeds.help.setweeklyshortschannel,
+                value: t.embeds.help.setweeklyshortschannelDesc
             },
             {
-                name: t.embeds.help.setminposition || '/setminposition',
-                value: t.embeds.help.setminpositionDesc || 'Set minimum world position to announce records (Admin/Mod only)'
+                name: t.embeds.help.setminposition,
+                value: t.embeds.help.setminpositionDesc
             },
             {
-                name: t.embeds.help.togglecampaignannouncements || '/togglecampaignannouncements',
-                value: t.embeds.help.togglecampaignannouncementsDesc || 'Enable or disable campaign record announcements (Admin/Mod only)'
+                name: t.embeds.help.togglecampaignannouncements,
+                value: t.embeds.help.togglecampaignannouncementsDesc
             },
             {
-                name: t.embeds.help.toggleweeklyshortsannouncements || '/toggleweeklyshortsannouncements',
-                value: t.embeds.help.toggleweeklyshortsannouncementsDesc || 'Enable or disable weekly shorts announcements (Admin/Mod only)'
+                name: t.embeds.help.toggleweeklyshortsannouncements,
+                value: t.embeds.help.toggleweeklyshortsannouncementsDesc
             },
-            {
-                name: t.embeds.help.updateDisplayNames || '/update-display-names',
-                value: t.embeds.help.updateDisplayNamesDesc || 'Update all player display names from Trackmania API (Admin only)'
-            }
         )
         .setTimestamp(new Date())
         .setFooter({ text: t.embeds.help.footer });
@@ -741,20 +733,32 @@ async function handleToggleCampaignAnnouncements(interaction) {
 
         const currentStatus = await getCampaignAnnouncementsStatus(guildId);
         if (currentStatus === enabled) {
-            const statusText = enabled ? 'enabled' : 'disabled';
+            const statusText = enabled ?
+                (t.responses.togglecampaignannouncements?.enabledStatus || 'enabled') :
+                (t.responses.togglecampaignannouncements?.disabledStatus || 'disabled');
+
             return await interaction.editReply(
-                t.responses.togglecampaignannouncements?.alreadySet ||
-                `Campaign announcements are already ${statusText} for this server.`
+                formatString(
+                    t.responses.togglecampaignannouncements?.alreadySet ||
+                    `Campaign announcements are already {status} for this server.`,
+                    { status: statusText }
+                )
             );
         }
 
         const result = await toggleCampaignAnnouncements(guildId, enabled);
 
         if (result) {
-            const statusText = enabled ? 'enabled' : 'disabled';
+            const statusText = enabled ?
+                (t.responses.togglecampaignannouncements?.enabledStatus || 'enabled') :
+                (t.responses.togglecampaignannouncements?.disabledStatus || 'disabled');
+
             await interaction.editReply(
-                t.responses.togglecampaignannouncements?.success ||
-                `✅ Campaign announcements have been ${statusText} for this server.`
+                formatString(
+                    t.responses.togglecampaignannouncements?.success ||
+                    `✅ Campaign announcements have been {status} for this server.`,
+                    { status: statusText }
+                )
             );
         } else {
             await interaction.editReply(
@@ -795,20 +799,32 @@ async function handleToggleWeeklyShortsAnnouncements(interaction) {
 
         const currentStatus = await getWeeklyShortsAnnouncementsStatus(guildId);
         if (currentStatus === enabled) {
-            const statusText = enabled ? 'enabled' : 'disabled';
+            const statusText = enabled ?
+                (t.responses.toggleweeklyshortsannouncements?.enabledStatus || 'enabled') :
+                (t.responses.toggleweeklyshortsannouncements?.disabledStatus || 'disabled');
+
             return await interaction.editReply(
-                t.responses.toggleweeklyshortsannouncements?.alreadySet ||
-                `Weekly shorts announcements are already ${statusText} for this server.`
+                formatString(
+                    t.responses.toggleweeklyshortsannouncements?.alreadySet ||
+                    `Weekly shorts announcements are already {status} for this server.`,
+                    { status: statusText }
+                )
             );
         }
 
         const result = await toggleWeeklyShortsAnnouncements(guildId, enabled);
 
         if (result) {
-            const statusText = enabled ? 'enabled' : 'disabled';
+            const statusText = enabled ?
+                (t.responses.toggleweeklyshortsannouncements?.enabledStatus || 'enabled') :
+                (t.responses.toggleweeklyshortsannouncements?.disabledStatus || 'disabled');
+
             await interaction.editReply(
-                t.responses.toggleweeklyshortsannouncements?.success ||
-                `✅ Weekly shorts announcements have been ${statusText} for this server.`
+                formatString(
+                    t.responses.toggleweeklyshortsannouncements?.success ||
+                    `✅ Weekly shorts announcements have been {status} for this server.`,
+                    { status: statusText }
+                )
             );
         } else {
             await interaction.editReply(
@@ -908,7 +924,7 @@ async function showWeeklyShortMapLeaderboard(interaction, mapName, countryCode, 
         );
 
         const isMapNumber = /^[1-5]$/.test(mapName);
-        
+
         let matchingMap;
         if (isMapNumber) {
             const mapNumber = parseInt(mapName);

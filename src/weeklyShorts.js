@@ -3,7 +3,7 @@ import { ensureToken, invalidateTokens } from './auth.js';
 import { log } from './utils.js';
 import { getDb } from './db.js';
 import { getGuildPlayers } from './playerManager.js';
-import { getTranslations } from './localization/index.js';
+import { getTranslations, formatString } from './localization/index.js';
 import { EmbedBuilder } from 'discord.js';
 import { getZoneName, getZoneNamesForCountry } from './config/zones.js';
 import { getDisplayNamesBatch } from './oauth.js';
@@ -437,16 +437,16 @@ export function createWeeklyShortEmbed(record, t) {
         : t.embeds.newRecord.firstRecord;
 
     const embed = new EmbedBuilder()
-        .setTitle(t.embeds.newRecord.title.replace('{emoji}', emoji))
+        .setTitle(formatString(t.embeds.newRecord.title, { emoji }))
         .setColor(0xFF6B6B)
-        .setDescription(t.embeds.newRecord.description
-            .replace('{username}', record.username || 'Player')
-            .replace('{discordId}', record.discord_id)
-            .replace('{recordType}', recordType))
+        .setDescription(formatString(t.embeds.newRecord.description, {
+            username: record.username || 'Player',
+            discordId: record.discord_id,
+            recordType
+        }))
         .setAuthor({ name: 'Trackmania Weekly Shorts', iconURL: TRACKMANIA_ICON_URL })
         .addFields(
-            { name: t.embeds.newRecord.map, value: `**${cleanMapName(record.map_name) || 'Unknown Map'}**`, inline: false },
-            { name: t.embeds.newRecord.worldPosition, value: record.position === null ? "*Not ranked*" : `**#${record.position}**`, inline: true }
+            { name: t.embeds.newRecord.map, value: `**${cleanMapName(record.map_name) || 'Unknown Map'}**`, inline: false }
         );
 
     if (record.thumbnail_url && record.thumbnail_url.startsWith('http')) {
@@ -455,18 +455,24 @@ export function createWeeklyShortEmbed(record, t) {
 
     if (isImprovement) {
         const positionChange = record.previous_position - record.position;
-        let changeText;
+        let positionText;
+
+        // Format the position text with the differential in parentheses
         if (positionChange > 0) {
-            changeText = `↑ ${positionChange} places`;
+            positionText = `**#${record.position}** (-${positionChange})`;
         } else if (positionChange < 0) {
-            changeText = `↓ ${Math.abs(positionChange)} places`;
+            positionText = `**#${record.position}** (+${Math.abs(positionChange)})`;
         } else {
-            changeText = '→ Same position';
+            positionText = `**#${record.position}** (=)`;
         }
 
         embed.addFields(
-            { name: t.embeds.newRecord.previous, value: `#${record.previous_position}`, inline: true },
-            { name: t.embeds.newRecord.worldPosition, value: changeText, inline: true }
+            { name: t.embeds.newRecord.worldPosition, value: positionText, inline: true },
+            { name: t.embeds.newRecord.previous, value: `#${record.previous_position}`, inline: true }
+        );
+    } else {
+        embed.addFields(
+            { name: t.embeds.newRecord.worldPosition, value: `**#${record.position}**`, inline: true }
         );
     }
 
@@ -476,9 +482,10 @@ export function createWeeklyShortEmbed(record, t) {
 
     embed.setTimestamp(now)
         .setFooter({
-            text: t.embeds.newRecord.footer
-                .replace('{date}', dateStr)
-                .replace('{time}', timeStr)
+            text: formatString(t.embeds.newRecord.footer, {
+                date: dateStr,
+                time: timeStr
+            })
         });
 
     return embed;

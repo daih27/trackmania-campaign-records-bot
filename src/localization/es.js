@@ -24,7 +24,11 @@ export default {
         weeklyshortsleaderboardOption: 'Opcional: filtrar por nombre de mapa',
         weeklyshortsleaderboardCountryOption: 'Seleccionar un país',
         setminposition: 'Establecer la posición mundial mínima para anunciar récords',
-        setminpositionOption: 'Posición mundial mínima (ej. 5000)'
+        setminpositionOption: 'Posición mundial mínima (ej. 5000)',
+        togglecampaignannouncements: 'Activar o desactivar anuncios de récords de campaña',
+        togglecampaignannouncementsOption: 'Activar o desactivar anuncios de campaña',
+        toggleweeklyshortsannouncements: 'Activar o desactivar anuncios de weekly shorts',
+        toggleweeklyshortsannouncementsOption: 'Activar o desactivar anuncios de weekly shorts'
     },
 
     // Command responses
@@ -86,6 +90,22 @@ export default {
             changed: '✅ Los récords ahora solo se anunciarán para posiciones mundiales dentro del top {position}',
             error: '❌ No se pudo establecer la posición mundial mínima.'
         },
+        togglecampaignannouncements: {
+            noPermission: '❌ Necesitas permisos de administrador o moderador para usar este comando.',
+            success: '✅ Los anuncios de campaña han sido {status} para este servidor.',
+            error: '❌ No se pudo actualizar la configuración de anuncios de campaña.',
+            alreadySet: 'Los anuncios de campaña ya están {status} para este servidor.',
+            enabledStatus: 'activados',
+            disabledStatus: 'desactivados'
+        },
+        toggleweeklyshortsannouncements: {
+            noPermission: '❌ Necesitas permisos de administrador o moderador para usar este comando.',
+            success: '✅ Los anuncios de weekly shorts han sido {status} para este servidor.',
+            error: '❌ No se pudo actualizar la configuración de anuncios de weekly shorts.',
+            alreadySet: 'Los anuncios de weekly shorts ya están {status} para este servidor.',
+            enabledStatus: 'activados',
+            disabledStatus: 'desactivados'
+        },
         error: {
             unknown: 'Ocurrió un error al procesar este comando.',
             unknownCommand: 'Comando desconocido.'
@@ -143,6 +163,10 @@ export default {
             setweeklyshortschannelDesc: 'Establecer el canal para anuncios de weekly shorts (solo admin/mod)',
             setminposition: '🎯 /setminposition',
             setminpositionDesc: 'Establecer posición mundial mínima para anunciar récords (solo admin/mod)',
+            togglecampaignannouncements: '🔔 /togglecampaignannouncements',
+            togglecampaignannouncementsDesc: 'Activar o desactivar anuncios de récords de campaña (solo admin/mod)',
+            toggleweeklyshortsannouncements: '🔔 /toggleweeklyshortsannouncements',
+            toggleweeklyshortsannouncementsDesc: 'Activar o desactivar anuncios de weekly shorts (solo admin/mod)',
             footer: 'Los récords se verifican automáticamente'
         },
         newRecord: {
@@ -154,7 +178,11 @@ export default {
             time: '⏱️ Tiempo',
             worldPosition: '🌍 Posición Mundial',
             previous: '⏮️ Anterior',
-            footer: 'Récord establecido el {date} a las {time}'
+            footer: 'Récord establecido el {date} a las {time}',
+            places: 'posiciones',
+            samePosition: 'Misma posición',
+            improved: '↑ {count} posiciones',
+            worsened: '↓ {count} posiciones'
         }
     },
 
