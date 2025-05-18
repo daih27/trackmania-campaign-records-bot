@@ -181,7 +181,7 @@ async function handleRegister(interaction) {
     const guildId = interaction.guildId;
 
     try {
-        await interaction.deferReply();
+        await interaction.reply(t.responses.register.processing || '🔄 Registering your Trackmania account...');
 
         if (tmOAuthClientId && tmOAuthClientSecret) {
             try {
@@ -222,7 +222,7 @@ async function handleUnregister(interaction) {
     const guildId = interaction.guildId;
 
     try {
-        await interaction.deferReply();
+        await interaction.reply(t.responses.unregister.processing || '🔄 Unregistering your Trackmania account...');
         const result = await unregisterPlayer(interaction.user.id, guildId);
 
         if (result.success) {
@@ -245,7 +245,7 @@ async function handleRecords(interaction) {
     const guildId = interaction.guildId;
 
     try {
-        await interaction.deferReply();
+        await interaction.reply(t.responses.records.processing || '🔄 Fetching your recent records...');
         const player = await getPlayerByDiscordId(interaction.user.id, guildId);
 
         if (!player) {
@@ -378,7 +378,6 @@ async function handleHelp(interaction) {
             },
         )
         .setTimestamp(new Date())
-        .setFooter({ text: t.embeds.help.footer });
 
     await interaction.reply({ embeds: [embed] });
 }
@@ -506,7 +505,7 @@ async function handleLanguage(interaction) {
     }
 
     try {
-        await interaction.deferReply();
+        await interaction.reply(t.responses.language.processing || '🔄 Changing bot language...');
         const langCode = interaction.options.getString('lang');
         const guildId = interaction.guildId;
 
@@ -540,7 +539,7 @@ async function handleSetCountry(interaction) {
     }
 
     try {
-        await interaction.deferReply();
+        await interaction.reply(t.responses.setcountry.processing || '🔄 Setting default country...');
         const countryCode = interaction.options.getString('country');
         const guildId = interaction.guildId;
 
@@ -575,7 +574,7 @@ async function handleSetChannel(interaction) {
     }
 
     try {
-        await interaction.deferReply();
+        await interaction.reply(t.responses.setchannel?.processing || '🔄 Setting announcement channel...');
         const channel = interaction.options.getChannel('channel');
         const guildId = interaction.guildId;
 
@@ -624,7 +623,7 @@ async function handleSetWeeklyShortsChannel(interaction) {
     }
 
     try {
-        await interaction.deferReply();
+        await interaction.reply(t.responses.setweeklyshortschannel?.processing || '🔄 Setting weekly shorts announcement channel...');
         const channel = interaction.options.getChannel('channel');
         const guildId = interaction.guildId;
 
@@ -678,7 +677,7 @@ async function handleSetMinPosition(interaction) {
     }
 
     try {
-        await interaction.deferReply();
+        await interaction.reply(t.responses.setminposition?.processing || '🔄 Setting minimum world position...');
         const position = interaction.options.getInteger('position');
         const guildId = interaction.guildId;
 
@@ -727,7 +726,7 @@ async function handleToggleCampaignAnnouncements(interaction) {
     }
 
     try {
-        await interaction.deferReply();
+        await interaction.reply(t.responses.togglecampaignannouncements?.processing || '🔄 Updating campaign announcement settings...');
         const enabled = interaction.options.getBoolean('enabled');
         const guildId = interaction.guildId;
 
@@ -793,7 +792,7 @@ async function handleToggleWeeklyShortsAnnouncements(interaction) {
     }
 
     try {
-        await interaction.deferReply();
+        await interaction.reply(t.responses.toggleweeklyshortsannouncements?.processing || '🔄 Updating weekly shorts announcement settings...');
         const enabled = interaction.options.getBoolean('enabled');
         const guildId = interaction.guildId;
 
@@ -849,7 +848,7 @@ async function handleWeeklyShortsLeaderboard(interaction) {
     const t = await getTranslations(interaction.guildId);
 
     try {
-        await interaction.deferReply();
+        await interaction.reply(t.responses.weeklyshortsleaderboard?.processing || '🔄 Fetching weekly shorts leaderboard...');
 
         const mapName = interaction.options.getString('map');
         const countryCode = interaction.options.getString('country') || await getDefaultCountry(interaction.guildId);

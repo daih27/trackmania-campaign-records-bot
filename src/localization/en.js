@@ -36,16 +36,19 @@ export default {
         register: {
             success: '✅ You have been registered for Trackmania record tracking!',
             updated: '✅ Your Trackmania account has been updated!',
-            failed: '❌ Registration failed: {error}'
+            failed: '❌ Registration failed: {error}',
+            processing: '🔄 Registering your Trackmania account...'
         },
         unregister: {
             success: '✅ You have been unregistered from Trackmania record tracking.',
-            failed: '❌ Unregistration failed: {error}'
+            failed: '❌ Unregistration failed: {error}',
+            processing: '🔄 Unregistering your Trackmania account...'
         },
         records: {
             notRegistered: 'You are not registered. Use `/register` to register your Trackmania account.',
             noRecords: "You don't have any records yet.",
-            error: '❌ An error occurred while retrieving your records.'
+            error: '❌ An error occurred while retrieving your records.',
+            processing: '🔄 Fetching your recent records...'
         },
         leaderboard: {
             noRecordsMap: 'No records found for maps matching "{mapName}".',
@@ -55,40 +58,47 @@ export default {
             error: '❌ An error occurred while retrieving the leaderboard.',
             fetchingMaps: '🔄 Fetching maps from current campaign...',
             errorFetchingMaps: '❌ Error fetching maps from API. Please try again later.',
-            loadingSeason: '🔄 Loading campaign leaderboard...'
+            loadingSeason: '🔄 Loading campaign leaderboard...',
+            processing: '🔄 Fetching leaderboard data...'
         },
         language: {
             changed: '✅ Language has been changed to English.',
             error: '❌ An error occurred while changing the language.',
-            noPermission: '❌ You need administrator or moderator permissions to change the bot language.'
+            noPermission: '❌ You need administrator or moderator permissions to change the bot language.',
+            processing: '🔄 Changing bot language...'
         },
         setcountry: {
             changed: '✅ Default country has been set to {country}.',
             error: '❌ An error occurred while setting the default country.',
-            noPermission: '❌ You need administrator or moderator permissions to change the default country.'
+            noPermission: '❌ You need administrator or moderator permissions to change the default country.',
+            processing: '🔄 Setting default country...'
         },
         setchannel: {
             noPermission: '❌ You need administrator or moderator permissions to use this command.',
             changed: '✅ Record announcements will now be sent to {channel}',
             error: '❌ Failed to set the announcement channel.',
-            notText: '❌ The selected channel must be a text channel.'
+            notText: '❌ The selected channel must be a text channel.',
+            processing: '🔄 Setting announcement channel...'
         },
         setweeklyshortschannel: {
             noPermission: '❌ You need administrator or moderator permissions to use this command.',
             changed: '✅ Weekly shorts announcements will now be sent to {channel}',
             error: '❌ Failed to set the weekly shorts announcement channel.',
-            notText: '❌ The selected channel must be a text channel.'
+            notText: '❌ The selected channel must be a text channel.',
+            processing: '🔄 Setting weekly shorts announcement channel...'
         },
         weeklyshortsleaderboard: {
             error: '❌ An error occurred while fetching the weekly shorts leaderboard.',
             noSeasonRecords: 'No {country} players found in the current weekly shorts.',
             noRecordsMap: 'No weekly shorts map found matching "{mapName}".',
-            noCountryRecords: 'No records found for {country} in {mapName}.'
+            noCountryRecords: 'No records found for {country} in {mapName}.',
+            processing: '🔄 Fetching weekly shorts leaderboard...'
         },
         setminposition: {
             noPermission: '❌ You need administrator or moderator permissions to use this command.',
             changed: '✅ Records will now only be announced for world positions within the top {position}',
-            error: '❌ Failed to set the minimum world position.'
+            error: '❌ Failed to set the minimum world position.',
+            processing: '🔄 Setting minimum world position...'
         },
         togglecampaignannouncements: {
             noPermission: '❌ You need administrator or moderator permissions to use this command.',
@@ -96,7 +106,8 @@ export default {
             error: '❌ Failed to update campaign announcement settings.',
             alreadySet: 'Campaign announcements are already {status} for this server.',
             enabledStatus: 'enabled',
-            disabledStatus: 'disabled'
+            disabledStatus: 'disabled',
+            processing: '🔄 Updating campaign announcement settings...'
         },
         toggleweeklyshortsannouncements: {
             noPermission: '❌ You need administrator or moderator permissions to use this command.',
@@ -104,7 +115,8 @@ export default {
             error: '❌ Failed to update weekly shorts announcement settings.',
             alreadySet: 'Weekly shorts announcements are already {status} for this server.',
             enabledStatus: 'enabled',
-            disabledStatus: 'disabled'
+            disabledStatus: 'disabled',
+            processing: '🔄 Updating weekly shorts announcement settings...'
         },
         error: {
             unknown: 'An error occurred while processing this command.',
@@ -167,7 +179,6 @@ export default {
             togglecampaignannouncementsDesc: 'Enable or disable campaign record announcements (admin/mod only)',
             toggleweeklyshortsannouncements: '🔔 /toggleweeklyshortsannouncements',
             toggleweeklyshortsannouncementsDesc: 'Enable or disable weekly shorts announcements (admin/mod only)',
-            footer: 'Records are checked automatically'
         },
         newRecord: {
             title: '{emoji} New PB!',

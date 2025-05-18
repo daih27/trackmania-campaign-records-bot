@@ -36,16 +36,19 @@ export default {
         register: {
             success: '✅ ¡Has sido registrado/a para el seguimiento de récords de Trackmania!',
             updated: '✅ ¡Tu cuenta de Trackmania ha sido actualizada!',
-            failed: '❌ Registro fallido: {error}'
+            failed: '❌ Registro fallido: {error}',
+            processing: '🔄 Registrando tu cuenta de Trackmania...'
         },
         unregister: {
             success: '✅ Tu registro del sistema de seguimiento de récords de Trackmania ha sido cancelado.',
-            failed: '❌ Cancelación de registro fallida: {error}'
+            failed: '❌ Cancelación de registro fallida: {error}',
+            processing: '🔄 Cancelando tu registro...'
         },
         records: {
             notRegistered: 'No estás registrado/a. Usa `/register` para registrar tu cuenta de Trackmania.',
             noRecords: "Aún no tienes récords.",
-            error: '❌ Ocurrió un error al obtener tus récords.'
+            error: '❌ Ocurrió un error al obtener tus récords.',
+            processing: '🔄 Obteniendo tus récords recientes...'
         },
         leaderboard: {
             noRecordsMap: 'No se encontraron récords para mapas que coincidan con "{mapName}".',
@@ -55,40 +58,47 @@ export default {
             error: '❌ Ocurrió un error al obtener la tabla de clasificación.',
             fetchingMaps: '🔄 Obteniendo mapas de la campaña actual...',
             errorFetchingMaps: '❌ Error al obtener mapas de la API. Por favor, inténtalo de nuevo más tarde.',
-            loadingSeason: '🔄 Cargando ranking de la campaña actual...'
+            loadingSeason: '🔄 Cargando ranking de la campaña actual...',
+            processing: '🔄 Obteniendo datos de la clasificación...'
         },
         language: {
             changed: '✅ El idioma ha sido cambiado a Español.',
             error: '❌ Ocurrió un error al cambiar el idioma.',
-            noPermission: '❌ Necesitas permisos de administrador o moderador para cambiar el idioma del bot.'
+            noPermission: '❌ Necesitas permisos de administrador o moderador para cambiar el idioma del bot.',
+            processing: '🔄 Cambiando el idioma del bot...'
         },
         setcountry: {
             changed: '✅ El país predeterminado ha sido establecido a {country}.',
             error: '❌ Ocurrió un error al establecer el país predeterminado.',
-            noPermission: '❌ Necesitas permisos de administrador o moderador para cambiar el país predeterminado.'
+            noPermission: '❌ Necesitas permisos de administrador o moderador para cambiar el país predeterminado.',
+            processing: '🔄 Estableciendo el país predeterminado...'
         },
         setchannel: {
             noPermission: '❌ Necesitas permisos de administrador o moderador para usar este comando.',
             changed: '✅ Los anuncios de récords ahora se enviarán a {channel}',
             error: '❌ No se pudo establecer el canal de anuncios.',
-            notText: '❌ El canal seleccionado debe ser un canal de texto.'
+            notText: '❌ El canal seleccionado debe ser un canal de texto.',
+            processing: '🔄 Estableciendo el canal de anuncios...'
         },
         setweeklyshortschannel: {
             noPermission: '❌ Necesitas permisos de administrador o moderador para usar este comando.',
             changed: '✅ Los anuncios de weekly shorts ahora se enviarán a {channel}',
             error: '❌ No se pudo establecer el canal de anuncios de weekly shorts.',
-            notText: '❌ El canal seleccionado debe ser un canal de texto.'
+            notText: '❌ El canal seleccionado debe ser un canal de texto.',
+            processing: '🔄 Estableciendo el canal de anuncios de weekly shorts...'
         },
         weeklyshortsleaderboard: {
             error: '❌ Ocurrió un error al obtener la tabla de clasificación de weekly shorts.',
             noSeasonRecords: 'No se encontraron jugadores de {country} en los weekly shorts actuales.',
             noRecordsMap: 'No se encontró ningún mapa de weekly shorts que coincida con "{mapName}".',
-            noCountryRecords: 'No se encontraron récords de {country} en {mapName}.'
+            noCountryRecords: 'No se encontraron récords de {country} en {mapName}.',
+            processing: '🔄 Obteniendo la clasificación de weekly shorts...'
         },
         setminposition: {
             noPermission: '❌ Necesitas permisos de administrador o moderador para usar este comando.',
             changed: '✅ Los récords ahora solo se anunciarán para posiciones mundiales dentro del top {position}',
-            error: '❌ No se pudo establecer la posición mundial mínima.'
+            error: '❌ No se pudo establecer la posición mundial mínima.',
+            processing: '🔄 Estableciendo la posición mundial mínima...'
         },
         togglecampaignannouncements: {
             noPermission: '❌ Necesitas permisos de administrador o moderador para usar este comando.',
@@ -96,7 +106,8 @@ export default {
             error: '❌ No se pudo actualizar la configuración de anuncios de campaña.',
             alreadySet: 'Los anuncios de campaña ya están {status} para este servidor.',
             enabledStatus: 'activados',
-            disabledStatus: 'desactivados'
+            disabledStatus: 'desactivados',
+            processing: '🔄 Actualizando la configuración de anuncios de campaña...'
         },
         toggleweeklyshortsannouncements: {
             noPermission: '❌ Necesitas permisos de administrador o moderador para usar este comando.',
@@ -104,7 +115,8 @@ export default {
             error: '❌ No se pudo actualizar la configuración de anuncios de weekly shorts.',
             alreadySet: 'Los anuncios de weekly shorts ya están {status} para este servidor.',
             enabledStatus: 'activados',
-            disabledStatus: 'desactivados'
+            disabledStatus: 'desactivados',
+            processing: '🔄 Actualizando la configuración de anuncios de weekly shorts...'
         },
         error: {
             unknown: 'Ocurrió un error al procesar este comando.',
@@ -166,8 +178,7 @@ export default {
             togglecampaignannouncements: '🔔 /togglecampaignannouncements',
             togglecampaignannouncementsDesc: 'Activar o desactivar anuncios de récords de campaña (solo admin/mod)',
             toggleweeklyshortsannouncements: '🔔 /toggleweeklyshortsannouncements',
-            toggleweeklyshortsannouncementsDesc: 'Activar o desactivar anuncios de weekly shorts (solo admin/mod)',
-            footer: 'Los récords se verifican automáticamente'
+            toggleweeklyshortsannouncementsDesc: 'Activar o desactivar anuncios de weekly shorts (solo admin/mod)'
         },
         newRecord: {
             title: '{emoji} ¡Nuevo PB!',

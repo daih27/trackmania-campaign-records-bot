@@ -17,7 +17,7 @@ async function handleLeaderboard(interaction) {
     const t = await getTranslations(interaction.guildId);
 
     try {
-        await interaction.deferReply();
+        await interaction.reply(t.responses.leaderboard.processing || '🔄 Fetching leaderboard data...');
         const db = await getDb();
         const mapName = interaction.options.getString('map');
 

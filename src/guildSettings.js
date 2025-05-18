@@ -55,7 +55,7 @@ export async function setDefaultCountry(guildId, zoneId) {
             );
         } else {
             await db.run(
-                'INSERT INTO guild_settings (guild_id, default_country) VALUES (?, ?)',
+                'INSERT INTO guild_settings (guild_id, default_zone_id) VALUES (?, ?)',
                 [guildId, zoneId]
             );
         }
