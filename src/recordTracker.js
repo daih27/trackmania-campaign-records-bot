@@ -585,12 +585,22 @@ export async function checkRecords(client) {
         log('Starting record check...');
 
         const isAnyEnabled = await import('./guildSettings.js').then(module => module.isAnyCampaignAnnouncementsEnabled());
+        const disabledGuilds = [];
+        
+        const guilds = client.guilds.cache;
+        for (const [guildId, guild] of guilds) {
+            const isEnabled = await import('./guildSettings.js').then(module => module.getCampaignAnnouncementsStatus(guildId));
+            if (!isEnabled) {
+                disabledGuilds.push(guildId);
+            }
+        }
+        
         if (!isAnyEnabled) {
-            log('Campaign announcements are disabled for all guilds, skipping record check');
-            return;
+            log('Campaign announcements are disabled for all guilds, but continuing to scan records (will not announce)');
+        } else {
+            log(`Campaign announcements are disabled for ${disabledGuilds.length} guilds`);
         }
 
-        const guilds = client.guilds.cache;
         const guildPlayerMap = new Map();
         const allAccountIds = new Set();
         let lowestMinPosition = 10000;
@@ -744,6 +754,28 @@ export async function checkRecords(client) {
                                     );
                                 }
                                 log(`Record for ${accountId} on ${mapName} marked as pre-existing for all guilds`);
+                            } else {
+                                if (!isAnyEnabled) {
+                                    for (const [guildId, _] of guilds) {
+                                        await db.run(
+                                            `INSERT OR IGNORE INTO guild_announcement_status 
+                                             (guild_id, record_id, ineligible_for_announcement) 
+                                             VALUES (?, ?, 1)`,
+                                            [guildId, result.recordId]
+                                        );
+                                    }
+                                    log(`Record for ${accountId} on ${mapName} marked as ineligible for all guilds (all announcements disabled)`);
+                                } else if (disabledGuilds.length > 0) {
+                                    for (const guildId of disabledGuilds) {
+                                        await db.run(
+                                            `INSERT OR IGNORE INTO guild_announcement_status 
+                                             (guild_id, record_id, ineligible_for_announcement) 
+                                             VALUES (?, ?, 1)`,
+                                            [guildId, result.recordId]
+                                        );
+                                    }
+                                    log(`Record for ${accountId} on ${mapName} marked as ineligible for ${disabledGuilds.length} guilds with disabled announcements`);
+                                }
                             }
                         }
 
@@ -954,6 +986,12 @@ export async function createCountryLeaderboardEmbed(mapName, mapUid, thumbnailUr
  */
 async function announceNewRecords(client, db) {
     try {
+        const isAnyEnabled = await import('./guildSettings.js').then(module => module.isAnyCampaignAnnouncementsEnabled());
+        if (!isAnyEnabled) {
+            log('Campaign announcements are disabled for all guilds, skipping announcement phase');
+            return;
+        }
+        
         const guilds = client.guilds.cache;
         const allGloballyUnannounced = await getUnannouncedRecords(db);
 
@@ -963,6 +1001,25 @@ async function announceNewRecords(client, db) {
         }
 
         log(`Found ${allGloballyUnannounced.length} unannounced records to process`);
+        
+        // Clear any existing ineligibility flags from when announcements were disabled but now enabled
+        for (const [guildId, guild] of guilds) {
+            const isEnabled = await import('./guildSettings.js').then(module => module.getCampaignAnnouncementsStatus(guildId));
+            if (isEnabled) {
+                // Clear ineligibility flags for records in guilds where announcements are now enabled
+                await db.run(
+                    `DELETE FROM guild_announcement_status 
+                     WHERE guild_id = ? 
+                     AND record_id IN (
+                        SELECT r.id FROM records r 
+                        WHERE r.announced = 0
+                     ) 
+                     AND existed_before_registration = 0`,
+                    [guildId]
+                );
+                log(`Cleared ineligibility flags for guild ${guildId} where announcements are now enabled`);
+            }
+        }
 
         const announcedInAnyGuild = new Set();
 
@@ -999,11 +1056,14 @@ async function announceNewRecords(client, db) {
 
             for (const record of guildEligibleRecords) {
                 let worldPosition = null;
-                try {
-                    worldPosition = await fetchRecordPosition(record.map_uid, record.time_ms);
-                    log(`World position for ${record.username} on ${record.map_name}: #${worldPosition}`);
-                } catch (positionError) {
-                    log(`Failed to fetch world position: ${positionError.message}`, 'warn');
+                
+                if (isAnyEnabled) {
+                    try {
+                        worldPosition = await fetchRecordPosition(record.map_uid, record.time_ms);
+                        log(`World position for ${record.username} on ${record.map_name}: #${worldPosition}`);
+                    } catch (positionError) {
+                        log(`Failed to fetch world position: ${positionError.message}`, 'warn');
+                    }
                 }
 
                 if (worldPosition && worldPosition > minPosition) {
