@@ -1002,25 +1002,6 @@ async function announceNewRecords(client, db) {
 
         log(`Found ${allGloballyUnannounced.length} unannounced records to process`);
         
-        // Clear any existing ineligibility flags from when announcements were disabled but now enabled
-        for (const [guildId, guild] of guilds) {
-            const isEnabled = await import('./guildSettings.js').then(module => module.getCampaignAnnouncementsStatus(guildId));
-            if (isEnabled) {
-                // Clear ineligibility flags for records in guilds where announcements are now enabled
-                await db.run(
-                    `DELETE FROM guild_announcement_status 
-                     WHERE guild_id = ? 
-                     AND record_id IN (
-                        SELECT r.id FROM records r 
-                        WHERE r.announced = 0
-                     ) 
-                     AND existed_before_registration = 0`,
-                    [guildId]
-                );
-                log(`Cleared ineligibility flags for guild ${guildId} where announcements are now enabled`);
-            }
-        }
-
         const announcedInAnyGuild = new Set();
 
         for (const [guildId, guild] of guilds) {
