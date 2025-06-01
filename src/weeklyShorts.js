@@ -12,21 +12,6 @@ import { fetchMapInfo } from './recordTracker.js';
 import { getMinWorldPosition } from './guildSettings.js';
 
 /**
- * Builds SQL parameters array based on which values are null
- * @param {Array} prefixParams - Parameters to include at the start
- * @param {*} param1 - First parameter which might be null
- * @param {*} param2 - Second parameter which might be null
- * @param {Array} suffixParams - Parameters to include at the end
- * @returns {Array} - Array of parameters with nulls filtered out
- */
-function buildSqlParams(prefixParams = [], param1, param2, suffixParams = []) {
-    const params = [...prefixParams];
-    if (param1 !== null) params.push(param1);
-    if (param2 !== null) params.push(param2);
-    return [...params, ...suffixParams];
-}
-
-/**
  * Cleans Trackmania formatting tags from a map name
  * @param {string} mapName - The original map name with formatting tags
  * @returns {string} Cleaned map name without formatting tags
@@ -455,7 +440,6 @@ export function createWeeklyShortEmbed(record, t) {
         const positionChange = record.previous_position - record.position;
         let positionText;
 
-        // Format the position text with the differential in parentheses
         if (positionChange > 0) {
             positionText = `**#${record.position}** (-${positionChange})`;
         } else if (positionChange < 0) {
@@ -588,6 +572,7 @@ export async function checkWeeklyShorts(client, defaultMaxPosition = 10000) {
 
             const currentRecords = {};
             const playersWithNewRecords = [];
+            const playerGuildEligibility = new Map();
 
             if (recordsData && recordsData.length > 0) {
                 for (const record of recordsData) {
@@ -642,11 +627,52 @@ export async function checkWeeklyShorts(client, defaultMaxPosition = 10000) {
                         }
 
                         const recordDate = new Date(recordTimestamp);
-                        const existedBeforeRegistration = recordDate < registeredAt;
+                        const guildEligibility = new Map();
+                        for (const [guildId, guildPlayers] of guildPlayerMap) {
+                            const guildPlayer = guildPlayers.find(p => p.account_id === accountId);
+                            if (guildPlayer) {
+                                let guildRegisteredAt;
+                                if (guildPlayer.registered_at) {
+                                    if (typeof guildPlayer.registered_at === 'string') {
+                                        const utcString = guildPlayer.registered_at.endsWith('Z') ?
+                                            guildPlayer.registered_at :
+                                            guildPlayer.registered_at.replace(' ', 'T') + 'Z';
+                                        guildRegisteredAt = new Date(utcString);
+                                    } else if (guildPlayer.registered_at instanceof Date) {
+                                        guildRegisteredAt = new Date(Date.UTC(
+                                            guildPlayer.registered_at.getUTCFullYear(),
+                                            guildPlayer.registered_at.getUTCMonth(),
+                                            guildPlayer.registered_at.getUTCDate(),
+                                            guildPlayer.registered_at.getUTCHours(),
+                                            guildPlayer.registered_at.getUTCMinutes(),
+                                            guildPlayer.registered_at.getUTCSeconds(),
+                                            guildPlayer.registered_at.getUTCMilliseconds()
+                                        ));
+                                    } else {
+                                        guildRegisteredAt = new Date(guildPlayer.registered_at);
+                                    }
+                                } else {
+                                    guildRegisteredAt = new Date();
+                                }
+                                
+                                const existedBeforeRegistration = recordDate < guildRegisteredAt;
+                                guildEligibility.set(guildId, { existedBeforeRegistration, player: guildPlayer });
+                                
+                                log(`Weekly shorts guild ${guildId} eligibility for ${accountId}: record ${recordDate.toISOString()} vs registration ${guildRegisteredAt.toISOString()} = ${existedBeforeRegistration ? 'pre-existing' : 'eligible'}`);
+                            }
+                        }
+                        
+                        playerGuildEligibility.set(accountId, guildEligibility);
+                        
+                        let shouldSkipRecord = true;
+                        for (const [guildId, eligibility] of guildEligibility) {
+                            if (!eligibility.existedBeforeRegistration) {
+                                shouldSkipRecord = false;
+                                break;
+                            }
+                        }
 
-                        log(`Timestamp comparison for ${accountId}: ${recordDate.toISOString()} < ${registeredAt.toISOString()} = ${existedBeforeRegistration}`);
-
-                        if (existedBeforeRegistration) {
+                        if (shouldSkipRecord) {
                             let recordId = existingDbRecord?.id;
 
                             if (!existingDbRecord) {
@@ -663,19 +689,21 @@ export async function checkWeeklyShorts(client, defaultMaxPosition = 10000) {
                                     [player.id, dbMapId, null, null, recordTimestamp]
                                 );
 
-                                log(`Added pre-existing record for ${accountId} on map ${mapPosition + 1} without position`);
+                                log(`Added pre-existing weekly shorts record for ${accountId} on map ${mapPosition + 1} without position`);
                             }
 
-                            for (const [guildId, _] of guilds) {
-                                await db.run(
-                                    `INSERT OR IGNORE INTO guild_announcement_status 
-                                     (guild_id, weekly_short_record_id, ineligible_for_announcement, existed_before_registration) 
-                                     VALUES (?, ?, 1, 1)`,
-                                    [guildId, recordId]
-                                );
+                            for (const [guildId, eligibility] of guildEligibility) {
+                                if (eligibility.existedBeforeRegistration) {
+                                    await db.run(
+                                        `INSERT OR IGNORE INTO guild_announcement_status 
+                                         (guild_id, weekly_short_record_id, ineligible_for_announcement, existed_before_registration) 
+                                         VALUES (?, ?, 1, 1)`,
+                                        [guildId, recordId]
+                                    );
+                                }
                             }
 
-                            log(`Marked pre-existing record for ${accountId} on map ${mapPosition + 1} as ineligible for all guilds`);
+                            log(`Marked pre-existing weekly shorts record for ${accountId} on map ${mapPosition + 1} as ineligible for relevant guilds`);
                             continue;
                         }
 
@@ -725,29 +753,29 @@ export async function checkWeeklyShorts(client, defaultMaxPosition = 10000) {
 
                     await db.run(
                         `INSERT INTO weekly_short_history (player_id, map_id, position, previous_position, timestamp) 
-                         VALUES (?, ?, ${position === null ? 'NULL' : '?'}, ${previousPosition === null ? 'NULL' : '?'}, ?)`,
-                        buildSqlParams([player.id, dbMapId], position, previousPosition, [timestamp])
+                         VALUES (?, ?, ?, ?, ?)`,
+                        [player.id, dbMapId, position, previousPosition, timestamp]
                     );
 
                     await db.run(
                         `UPDATE weekly_short_records 
-                         SET position = ${position === null ? 'NULL' : '?'}, timestamp = ?, recorded_at = datetime('now'), announced = 0
+                         SET position = ?, timestamp = ?, recorded_at = datetime('now'), announced = 0
                          WHERE player_id = ? AND map_id = ?`,
-                        position === null ? [timestamp, player.id, dbMapId] : [position, timestamp, player.id, dbMapId]
+                        [position, timestamp, player.id, dbMapId]
                     );
 
                     log(`Updated record for ${accountId} on map ${mapPosition + 1}: #${position === null ? 'null' : position} (previous: #${previousPosition === null ? 'null' : previousPosition})`);
                 } else {
                     await db.run(
                         `INSERT INTO weekly_short_history (player_id, map_id, position, previous_position, timestamp) 
-                         VALUES (?, ?, ${position === null ? 'NULL' : '?'}, NULL, ?)`,
-                        position === null ? [player.id, dbMapId, timestamp] : [player.id, dbMapId, position, timestamp]
+                         VALUES (?, ?, ?, NULL, ?)`,
+                        [player.id, dbMapId, position, timestamp]
                     );
 
                     await db.run(
                         `INSERT INTO weekly_short_records (player_id, map_id, position, timestamp, announced) 
-                         VALUES (?, ?, ${position === null ? 'NULL' : '?'}, ?, 0)`,
-                        position === null ? [player.id, dbMapId, timestamp] : [player.id, dbMapId, position, timestamp]
+                         VALUES (?, ?, ?, ?, 0)`,
+                        [player.id, dbMapId, position, timestamp]
                     );
 
                     log(`Added new record for ${accountId} on map ${mapPosition + 1}: #${position === null ? 'null' : position}`);
@@ -759,27 +787,48 @@ export async function checkWeeklyShorts(client, defaultMaxPosition = 10000) {
                 ))?.id;
 
                 if (recordId) {
-                    if (position > maxPositionToCheck) {
-                        for (const [guildId, _] of guilds) {
+                    const guildEligibility = playerGuildEligibility.get(accountId) || new Map();
+                    log(`Processing position eligibility for ${accountId}: found ${guildEligibility.size} guild eligibilities`);
+                    
+                    if (position !== null && position > maxPositionToCheck) {
+                        for (const [guildId, eligibility] of guildEligibility) {
                             await db.run(
                                 `INSERT OR IGNORE INTO guild_announcement_status (guild_id, weekly_short_record_id, ineligible_for_announcement) 
                                  VALUES (?, ?, 1)`,
                                 [guildId, recordId]
                             );
+                            log(`Marked ${accountId} as ineligible for guild ${guildId} due to position ${position} > ${maxPositionToCheck}`);
                         }
-                        log(`Position ${position} by ${accountId} exceeds minimum threshold (${maxPositionToCheck}) - marked as ineligible`);
-                    }
-
-                    for (const guildId of disabledGuilds) {
-                        await db.run(
-                            `INSERT OR IGNORE INTO guild_announcement_status (guild_id, weekly_short_record_id, ineligible_for_announcement) 
-                             VALUES (?, ?, 1)`,
-                            [guildId, recordId]
-                        );
-                    }
-
-                    if (disabledGuilds.length > 0) {
-                        log(`Record for ${accountId} on map ${mapPosition + 1} marked as ineligible for ${disabledGuilds.length} guilds with disabled announcements`);
+                        log(`Position ${position} by ${accountId} exceeds minimum threshold (${maxPositionToCheck}) - marked as ineligible for relevant guilds`);
+                    } else {
+                        for (const [guildId, eligibility] of guildEligibility) {
+                            if (!eligibility.existedBeforeRegistration) {
+                                if (!isAnyEnabled) {
+                                    await db.run(
+                                        `INSERT OR IGNORE INTO guild_announcement_status (guild_id, weekly_short_record_id, ineligible_for_announcement) 
+                                         VALUES (?, ?, 1)`,
+                                        [guildId, recordId]
+                                    );
+                                    log(`Weekly shorts record for ${accountId} on map ${mapPosition + 1} marked as ineligible for guild ${guildId} (all announcements disabled)`);
+                                } else if (disabledGuilds.includes(guildId)) {
+                                    await db.run(
+                                        `INSERT OR IGNORE INTO guild_announcement_status (guild_id, weekly_short_record_id, ineligible_for_announcement) 
+                                         VALUES (?, ?, 1)`,
+                                        [guildId, recordId]
+                                    );
+                                    log(`Weekly shorts record for ${accountId} on map ${mapPosition + 1} marked as ineligible for guild ${guildId} (announcements disabled for this guild)`);
+                                } else {
+                                    log(`Weekly shorts record for ${accountId} on map ${mapPosition + 1} left eligible for guild ${guildId} (position ${position} <= ${maxPositionToCheck}, announcements enabled)`);
+                                }
+                                // If announcements are enabled and record is new, leave it eligible (no entry in guild_announcement_status)
+                            } else {
+                                log(`Weekly shorts record for ${accountId} on map ${mapPosition + 1} was pre-existing for guild ${guildId}, already handled`);
+                            }
+                        }
+                        
+                        if (guildEligibility.size === 0) {
+                            log(`WARNING: No guild eligibility data found for ${accountId} during position processing!`);
+                        }
                     }
                 }
             }
@@ -933,23 +982,6 @@ async function announceWeeklyShortUpdates(client, db) {
 
         log(`Found ${allGloballyUnannounced.length} weekly short updates to process`);
 
-        for (const [guildId, guild] of guilds) {
-            const isEnabled = await import('./guildSettings.js').then(module => module.getWeeklyShortsAnnouncementsStatus(guildId));
-            if (isEnabled) {
-                await db.run(
-                    `DELETE FROM guild_announcement_status 
-                     WHERE guild_id = ? 
-                     AND weekly_short_record_id IN (
-                        SELECT r.id FROM weekly_short_records r 
-                        WHERE r.announced = 0
-                     ) 
-                     AND existed_before_registration = 0`,
-                    [guildId]
-                );
-                log(`Cleared ineligibility flags for guild ${guildId} where announcements are now enabled`);
-            }
-        }
-
         const announcedInAnyGuild = new Set();
 
         for (const [guildId, guild] of guilds) {
@@ -991,15 +1023,15 @@ async function announceWeeklyShortUpdates(client, db) {
             const t = await getTranslations(guildId);
 
             for (const record of guildEligibleRecords) {
-                if (record.position === undefined) {
-                    log(`Weekly short for ${record.username} has undefined position, skipping announcement in guild ${guildId}`);
+                if (record.position === undefined || record.position === null) {
+                    log(`Weekly short for ${record.username} has undefined position, marking as ineligible for guild ${guildId}`);
                     await db.run(
                         `INSERT OR IGNORE INTO guild_announcement_status (guild_id, weekly_short_record_id, ineligible_for_announcement) 
                          VALUES (?, ?, 1)`,
                         [guildId, record.record_id]
                     );
                     continue;
-                } else if (record.position !== null && record.position > maxPositionThreshold) {
+                } else if (record.position > maxPositionThreshold) {
                     log(`Weekly short position by ${record.username} (#${record.position}) does not meet position threshold (top ${maxPositionThreshold}) for guild ${guildId}`);
                     await db.run(
                         `INSERT OR IGNORE INTO guild_announcement_status (guild_id, weekly_short_record_id, ineligible_for_announcement) 

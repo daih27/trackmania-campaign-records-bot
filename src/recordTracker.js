@@ -299,71 +299,70 @@ export async function fetchPlayerNames(accountIds) {
 
 /**
  * Updates or inserts a player's record for a specific map in the database
- * Handles both new records and improvements to existing records
  * @param {Database} db - Database connection
  * @param {number} playerId - Player database ID
  * @param {number} mapId - Map database ID
  * @param {number} timeMs - Record time in milliseconds
  * @param {Date} playerRegisteredAt - When the player registered with the bot
- * @param {number} recordTimestamp - The timestamp when the record was set
+ * @param {string|number|Date} recordTimestamp - When the record was set
  * @returns {Object} Result object indicating if record was improved or is new
  */
 async function updateMapRecord(db, playerId, mapId, timeMs, playerRegisteredAt, recordTimestamp) {
     try {
         const currentRecord = await db.get(
-            'SELECT time_ms FROM records WHERE player_id = ? AND map_id = ?',
+            'SELECT time_ms, recorded_at FROM records WHERE player_id = ? AND map_id = ?',
             [playerId, mapId]
         );
+
+        let recordDate;
+        if (typeof recordTimestamp === 'string') {
+            recordDate = new Date(recordTimestamp);
+        } else if (typeof recordTimestamp === 'number') {
+            recordDate = new Date(recordTimestamp);
+        } else if (recordTimestamp instanceof Date) {
+            recordDate = recordTimestamp;
+        } else {
+            recordDate = new Date();
+        }
+
+        let regDate;
+        if (playerRegisteredAt instanceof Date) {
+            regDate = new Date(Date.UTC(
+                playerRegisteredAt.getUTCFullYear(),
+                playerRegisteredAt.getUTCMonth(),
+                playerRegisteredAt.getUTCDate(),
+                playerRegisteredAt.getUTCHours(),
+                playerRegisteredAt.getUTCMinutes(),
+                playerRegisteredAt.getUTCSeconds(),
+                playerRegisteredAt.getUTCMilliseconds()
+            ));
+        } else if (typeof playerRegisteredAt === 'string') {
+            const utcString = playerRegisteredAt.endsWith('Z') ?
+                playerRegisteredAt :
+                playerRegisteredAt.replace(' ', 'T') + 'Z';
+            regDate = new Date(utcString);
+        } else {
+            regDate = new Date(playerRegisteredAt);
+        }
 
         if (!currentRecord) {
             await db.run(
                 `INSERT INTO record_history (player_id, map_id, time_ms, previous_time_ms) 
-         VALUES (?, ?, ?, ?)`,
+                 VALUES (?, ?, ?, ?)`,
                 [playerId, mapId, timeMs, null]
             );
 
             const result = await db.run(
                 `INSERT INTO records (player_id, map_id, time_ms, announced) 
-         VALUES (?, ?, ?, 0)`,
+                 VALUES (?, ?, ?, 0)`,
                 [playerId, mapId, timeMs]
             );
 
             const recordId = result.lastID;
 
-            let recordDate;
-            if (typeof recordTimestamp === 'string') {
-                recordDate = new Date(recordTimestamp);
-            } else if (typeof recordTimestamp === 'number') {
-                recordDate = new Date(recordTimestamp);
-            } else if (recordTimestamp instanceof Date) {
-                recordDate = recordTimestamp;
-            } else {
-                recordDate = new Date();
-            }
-
-            let regDate;
-            if (playerRegisteredAt instanceof Date) {
-                regDate = new Date(Date.UTC(
-                    playerRegisteredAt.getUTCFullYear(),
-                    playerRegisteredAt.getUTCMonth(),
-                    playerRegisteredAt.getUTCDate(),
-                    playerRegisteredAt.getUTCHours(),
-                    playerRegisteredAt.getUTCMinutes(),
-                    playerRegisteredAt.getUTCSeconds(),
-                    playerRegisteredAt.getUTCMilliseconds()
-                ));
-            } else if (typeof playerRegisteredAt === 'string') {
-                const utcString = playerRegisteredAt.endsWith('Z') ?
-                    playerRegisteredAt :
-                    playerRegisteredAt.replace(' ', 'T') + 'Z';
-                regDate = new Date(utcString);
-            } else {
-                regDate = new Date(playerRegisteredAt);
-            }
-
             const existedBeforeRegistration = recordDate < regDate;
 
-            log(`Record timestamp check: ${recordDate.toISOString()} vs registration ${regDate.toISOString()} - existed before: ${existedBeforeRegistration}`);
+            log(`New record for player ${playerId} on map ${mapId}: ${timeMs}ms (timestamp: ${recordDate.toISOString()}, registration: ${regDate.toISOString()}, pre-existing: ${existedBeforeRegistration})`);
 
             return {
                 improved: false,
@@ -372,32 +371,40 @@ async function updateMapRecord(db, playerId, mapId, timeMs, playerRegisteredAt, 
                 existedBeforeRegistration: existedBeforeRegistration
             };
         }
-        else if (timeMs < currentRecord.time_ms) {
-            await db.run(
-                `INSERT INTO record_history (player_id, map_id, time_ms, previous_time_ms) 
-         VALUES (?, ?, ?, ?)`,
-                [playerId, mapId, timeMs, currentRecord.time_ms]
-            );
+        else {
+            const currentRecordDate = currentRecord.recorded_at ? new Date(currentRecord.recorded_at + 'Z') : new Date(0);
+            if (recordDate > currentRecordDate) {
+                await db.run(
+                    `INSERT INTO record_history (player_id, map_id, time_ms, previous_time_ms) 
+                     VALUES (?, ?, ?, ?)`,
+                    [playerId, mapId, timeMs, currentRecord.time_ms]
+                );
 
-            await db.run(
-                `UPDATE records 
-         SET time_ms = ?, recorded_at = datetime('now'), announced = 0
-         WHERE player_id = ? AND map_id = ?`,
-                [timeMs, playerId, mapId]
-            );
+                await db.run(
+                    `UPDATE records 
+                     SET time_ms = ?, recorded_at = datetime('now'), announced = 0
+                     WHERE player_id = ? AND map_id = ?`,
+                    [timeMs, playerId, mapId]
+                );
 
-            const record = await db.get(
-                'SELECT id FROM records WHERE player_id = ? AND map_id = ?',
-                [playerId, mapId]
-            );
+                const record = await db.get(
+                    'SELECT id FROM records WHERE player_id = ? AND map_id = ?',
+                    [playerId, mapId]
+                );
 
-            return {
-                improved: true,
-                previousTime: currentRecord.time_ms,
-                isFirstRecord: false,
-                recordId: record ? record.id : null,
-                existedBeforeRegistration: false
-            };
+                const existedBeforeRegistration = recordDate < regDate;
+                log(`Updated record for player ${playerId} on map ${mapId}: ${timeMs}ms (was ${currentRecord.time_ms}ms, timestamp: ${recordDate.toISOString()}, pre-existing: ${existedBeforeRegistration})`);
+
+                return {
+                    improved: true,
+                    previousTime: currentRecord.time_ms,
+                    isFirstRecord: false,
+                    recordId: record ? record.id : null,
+                    existedBeforeRegistration: existedBeforeRegistration
+                };
+            } else {
+                log(`No timestamp update for player ${playerId} on map ${mapId}: current timestamp ${currentRecordDate.toISOString()} >= new timestamp ${recordDate.toISOString()}`);
+            }
         }
         return {
             improved: false,
@@ -709,78 +716,86 @@ export async function checkRecords(client) {
                         }
                     }
 
-                    log(`Processing record: ${accountId} on ${mapName}: ${time}ms`);
+                    const recordTimestamp = rec.timestamp || new Date().toISOString();
+                    log(`Processing record for ${accountId} on ${mapName}: ${time}ms (timestamp: ${recordTimestamp})`);
 
-                    let registeredAt;
-                    if (player.registered_at) {
-                        if (typeof player.registered_at === 'string') {
-                            const utcString = player.registered_at.endsWith('Z') ?
-                                player.registered_at :
-                                player.registered_at.replace(' ', 'T') + 'Z';
-                            registeredAt = new Date(utcString);
-                        } else if (player.registered_at instanceof Date) {
-                            registeredAt = new Date(Date.UTC(
-                                player.registered_at.getUTCFullYear(),
-                                player.registered_at.getUTCMonth(),
-                                player.registered_at.getUTCDate(),
-                                player.registered_at.getUTCHours(),
-                                player.registered_at.getUTCMinutes(),
-                                player.registered_at.getUTCSeconds(),
-                                player.registered_at.getUTCMilliseconds()
-                            ));
-                        } else {
-                            registeredAt = new Date(player.registered_at);
+                    const guildEligibility = new Map();
+                    for (const [guildId, guildPlayers] of guildPlayerMap) {
+                        const guildPlayer = guildPlayers.find(p => p.account_id === accountId);
+                        if (guildPlayer) {
+                            let guildRegisteredAt;
+                            if (guildPlayer.registered_at) {
+                                if (typeof guildPlayer.registered_at === 'string') {
+                                    const utcString = guildPlayer.registered_at.endsWith('Z') ?
+                                        guildPlayer.registered_at :
+                                        guildPlayer.registered_at.replace(' ', 'T') + 'Z';
+                                    guildRegisteredAt = new Date(utcString);
+                                } else if (guildPlayer.registered_at instanceof Date) {
+                                    guildRegisteredAt = new Date(Date.UTC(
+                                        guildPlayer.registered_at.getUTCFullYear(),
+                                        guildPlayer.registered_at.getUTCMonth(),
+                                        guildPlayer.registered_at.getUTCDate(),
+                                        guildPlayer.registered_at.getUTCHours(),
+                                        guildPlayer.registered_at.getUTCMinutes(),
+                                        guildPlayer.registered_at.getUTCSeconds(),
+                                        guildPlayer.registered_at.getUTCMilliseconds()
+                                    ));
+                                } else {
+                                    guildRegisteredAt = new Date(guildPlayer.registered_at);
+                                }
+                            } else {
+                                guildRegisteredAt = new Date();
+                            }
+                            
+                            const recordDate = new Date(recordTimestamp);
+                            const existedBeforeRegistration = recordDate < guildRegisteredAt;
+                            guildEligibility.set(guildId, { existedBeforeRegistration, player: guildPlayer });
+                            
+                            log(`Guild ${guildId} eligibility for ${accountId}: record ${recordDate.toISOString()} vs registration ${guildRegisteredAt.toISOString()} = ${existedBeforeRegistration ? 'pre-existing' : 'eligible'}`);
                         }
-                    } else {
-                        registeredAt = new Date();
                     }
 
-                    const recordTimestamp = rec.timestamp || new Date().toISOString();
-                    log(`Record timestamp for ${accountId}: ${recordTimestamp}`);
-
-                    const result = await updateMapRecord(db, player.id, dbMapId, time, registeredAt, recordTimestamp);
+                    const firstGuildPlayer = Array.from(guildEligibility.values())[0].player;
+                    const result = await updateMapRecord(db, firstGuildPlayer.id, dbMapId, time, firstGuildPlayer.registered_at, recordTimestamp);
 
                     if (result.isFirstRecord || result.improved) {
                         playersWithUpdates.add(accountId);
 
                         if (result.recordId) {
-                            if (result.existedBeforeRegistration) {
-                                for (const [guildId, _] of guilds) {
+                            for (const [guildId, eligibility] of guildEligibility) {
+                                if (eligibility.existedBeforeRegistration) {
                                     await db.run(
                                         `INSERT OR IGNORE INTO guild_announcement_status 
                                          (guild_id, record_id, ineligible_for_announcement, existed_before_registration) 
                                          VALUES (?, ?, 1, 1)`,
                                         [guildId, result.recordId]
                                     );
-                                }
-                                log(`Record for ${accountId} on ${mapName} marked as pre-existing for all guilds`);
-                            } else {
-                                if (!isAnyEnabled) {
-                                    for (const [guildId, _] of guilds) {
+                                    log(`Record for ${accountId} on ${mapName} marked as pre-existing for guild ${guildId}`);
+                                } else {
+                                    if (!isAnyEnabled) {
                                         await db.run(
                                             `INSERT OR IGNORE INTO guild_announcement_status 
                                              (guild_id, record_id, ineligible_for_announcement) 
                                              VALUES (?, ?, 1)`,
                                             [guildId, result.recordId]
                                         );
-                                    }
-                                    log(`Record for ${accountId} on ${mapName} marked as ineligible for all guilds (all announcements disabled)`);
-                                } else if (disabledGuilds.length > 0) {
-                                    for (const guildId of disabledGuilds) {
+                                        log(`Record for ${accountId} on ${mapName} marked as ineligible for guild ${guildId} (all announcements disabled)`);
+                                    } else if (disabledGuilds.includes(guildId)) {
                                         await db.run(
                                             `INSERT OR IGNORE INTO guild_announcement_status 
                                              (guild_id, record_id, ineligible_for_announcement) 
                                              VALUES (?, ?, 1)`,
                                             [guildId, result.recordId]
                                         );
+                                        log(`Record for ${accountId} on ${mapName} marked as ineligible for guild ${guildId} (announcements disabled for this guild)`);
                                     }
-                                    log(`Record for ${accountId} on ${mapName} marked as ineligible for ${disabledGuilds.length} guilds with disabled announcements`);
                                 }
                             }
                         }
 
                         if (result.isFirstRecord) {
-                            log(`First record for ${accountId} on ${mapName}: ${time}ms (existed before registration: ${result.existedBeforeRegistration})`);
+                            const statusText = result.existedBeforeRegistration ? "(pre-existing)" : "(new)";
+                            log(`New record discovered for ${accountId} on ${mapName}: ${time}ms ${statusText}`);
                         } else {
                             log(`Improved record for ${accountId} on ${mapName}: ${time}ms (previous: ${result.previousTime}ms)`);
                         }
@@ -1038,18 +1053,27 @@ async function announceNewRecords(client, db) {
             for (const record of guildEligibleRecords) {
                 let worldPosition = null;
                 
-                if (isAnyEnabled) {
-                    try {
-                        worldPosition = await fetchRecordPosition(record.map_uid, record.time_ms);
-                        log(`World position for ${record.username} on ${record.map_name}: #${worldPosition}`);
-                    } catch (positionError) {
-                        log(`Failed to fetch world position: ${positionError.message}`, 'warn');
-                    }
+                try {
+                    worldPosition = await fetchRecordPosition(record.map_uid, record.time_ms);
+                    log(`World position for ${record.username} on ${record.map_name}: #${worldPosition}`);
+                } catch (positionError) {
+                    log(`Failed to fetch world position: ${positionError.message}`, 'warn');
                 }
 
                 if (worldPosition && worldPosition > minPosition) {
                     log(`Record by ${record.username} (#${worldPosition}) does not meet minimum position (top ${minPosition}) for guild ${guildId}`);
 
+                    await db.run(
+                        `INSERT OR IGNORE INTO guild_announcement_status (guild_id, record_id, ineligible_for_announcement) 
+                         VALUES (?, ?, 1)`,
+                        [guildId, record.record_id]
+                    );
+                    continue;
+                }
+
+                if (!worldPosition && minPosition < 10000) {
+                    log(`Could not determine position for ${record.username} on ${record.map_name}, marking as ineligible for strict position requirement (${minPosition}) in guild ${guildId}`);
+                    
                     await db.run(
                         `INSERT OR IGNORE INTO guild_announcement_status (guild_id, record_id, ineligible_for_announcement) 
                          VALUES (?, ?, 1)`,
