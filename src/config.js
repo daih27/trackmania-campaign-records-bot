@@ -1,4 +1,5 @@
 import dotenv from 'dotenv';
+import { getGlobalSettings } from './db.js';
 
 dotenv.config();
 
@@ -6,11 +7,39 @@ dotenv.config();
  * Record checking configuration
  * These values control how often the bot checks for new Trackmania records
  */
-// How often to check for new records
-export const RECORD_CHECK_INTERVAL = 15 * 60 * 1000;
+// How often to check for new records (default: 15 minutes)
+export const DEFAULT_RECORD_CHECK_INTERVAL = 15 * 60 * 1000;
 
-// How often to check for weekly shorts positions
-export const WEEKLY_SHORTS_CHECK_INTERVAL = 18 * 60 * 1000;
+// How often to check for weekly shorts positions (default: 18 minutes)
+export const DEFAULT_WEEKLY_SHORTS_CHECK_INTERVAL = 18 * 60 * 1000;
+
+/**
+ * Gets the current campaign check interval from database settings
+ * @returns {Promise<number>} Check interval in milliseconds
+ */
+export async function getCampaignCheckInterval() {
+    try {
+        const settings = await getGlobalSettings();
+        return settings.campaign_check_interval_ms || DEFAULT_RECORD_CHECK_INTERVAL;
+    } catch (error) {
+        console.warn('Failed to get campaign check interval from database, using default:', error.message);
+        return DEFAULT_RECORD_CHECK_INTERVAL;
+    }
+}
+
+/**
+ * Gets the current weekly shorts check interval from database settings
+ * @returns {Promise<number>} Check interval in milliseconds
+ */
+export async function getWeeklyShortsCheckInterval() {
+    try {
+        const settings = await getGlobalSettings();
+        return settings.weekly_shorts_check_interval_ms || DEFAULT_WEEKLY_SHORTS_CHECK_INTERVAL;
+    } catch (error) {
+        console.warn('Failed to get weekly shorts check interval from database, using default:', error.message);
+        return DEFAULT_WEEKLY_SHORTS_CHECK_INTERVAL;
+    }
+}
 
 // How long to wait after bot startup before performing the first record check (default: 5 seconds)
 export const INITIAL_RECORD_CHECK_DELAY = 5000;

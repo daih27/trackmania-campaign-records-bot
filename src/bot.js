@@ -1,11 +1,11 @@
 import { Client, GatewayIntentBits, EmbedBuilder, REST, Routes, SlashCommandBuilder, PermissionFlagsBits } from 'discord.js';
-import { discordToken, tmOAuthClientId, tmOAuthClientSecret, TRACKMANIA_ICON_URL, RECORD_CHECK_INTERVAL, WEEKLY_SHORTS_CHECK_INTERVAL, INITIAL_RECORD_CHECK_DELAY } from './config.js';
-import { startDefaultSchedules, clearAllSchedules, scheduleTask } from './utils/scheduler.js';
+import { discordToken, tmOAuthClientId, tmOAuthClientSecret, TRACKMANIA_ICON_URL, getCampaignCheckInterval, getWeeklyShortsCheckInterval, INITIAL_RECORD_CHECK_DELAY } from './config.js';
+import { startDefaultSchedules, clearAllSchedules, scheduleTask, clearSchedule } from './utils/scheduler.js';
 import { commandQueue, recordCheckQueue } from './utils/taskQueue.js';
 import { registerPlayer, unregisterPlayer, getPlayerByDiscordId } from './playerManager.js';
 import { getDisplayNames } from './oauth.js';
 import { formatTime, log } from './utils.js';
-import { getDb } from './db.js';
+import { getDb, isUserAuthorized, addAuthorizedUser, removeAuthorizedUser, setCampaignCheckInterval, setWeeklyShortsCheckInterval } from './db.js';
 import { getTranslations, setLanguage, getAvailableLanguages, formatString } from './localization/index.js';
 import { setDefaultCountry, setAnnouncementChannel, setWeeklyShortsAnnouncementChannel, setMinWorldPosition, toggleCampaignAnnouncements, toggleWeeklyShortsAnnouncements, getCampaignAnnouncementsStatus, getWeeklyShortsAnnouncementsStatus } from './guildSettings.js';
 import { getZoneName, getAvailableCountries } from './config/zones.js';
@@ -141,6 +141,43 @@ async function getCommands(t) {
                 option.setName('enabled')
                     .setDescription(t.commands.toggleweeklyshortsannouncementsOption || 'Enable or disable weekly shorts announcements')
                     .setRequired(true)),
+
+        new SlashCommandBuilder()
+            .setName('setcampaignsearchtime')
+            .setDescription(t.commands.setcampaignsearchtime || 'Set the campaign search interval (authorized users only)')
+            .addIntegerOption(option =>
+                option.setName('minutes')
+                    .setDescription(t.commands.setcampaignsearchtimeOption || 'Search interval in minutes (5-1440)')
+                    .setRequired(true)
+                    .setMinValue(5)
+                    .setMaxValue(1440)),
+
+        new SlashCommandBuilder()
+            .setName('setweeklyshortssearchtime')
+            .setDescription(t.commands.setweeklyshortssearchtime || 'Set the weekly shorts search interval (authorized users only)')
+            .addIntegerOption(option =>
+                option.setName('minutes')
+                    .setDescription(t.commands.setweeklyshortssearchtimeOption || 'Search interval in minutes (5-1440)')
+                    .setRequired(true)
+                    .setMinValue(5)
+                    .setMaxValue(1440)),
+
+        new SlashCommandBuilder()
+            .setName('authorizeuser')
+            .setDescription(t.commands.authorizeuser || 'Authorize a user to modify global settings (authorized users only)')
+            .addUserOption(option =>
+                option.setName('user')
+                    .setDescription(t.commands.authorizeuserOption || 'User to authorize')
+                    .setRequired(true)),
+
+        new SlashCommandBuilder()
+            .setName('unauthorizeuser')
+            .setDescription(t.commands.unauthorizeuser || 'Remove user authorization for global settings (authorized users only)')
+            .addUserOption(option =>
+                option.setName('user')
+                    .setDescription(t.commands.unauthorizeuserOption || 'User to unauthorize')
+                    .setRequired(true)),
+                    
     ].map(command => command.toJSON());
 }
 
@@ -376,6 +413,22 @@ async function handleHelp(interaction) {
                 name: t.embeds.help.toggleweeklyshortsannouncements,
                 value: t.embeds.help.toggleweeklyshortsannouncementsDesc
             },
+            {
+                name: t.embeds.help.setcampaignsearchtime,
+                value: t.embeds.help.setcampaignsearchtimeDesc
+            },
+            {
+                name: t.embeds.help.setweeklyshortssearchtime,
+                value: t.embeds.help.setweeklyshortssearchtimeDesc
+            },
+            {
+                name: t.embeds.help.authorizeuser,
+                value: t.embeds.help.authorizeuserDesc
+            },
+            {
+                name: t.embeds.help.unauthorizeuser,
+                value: t.embeds.help.unauthorizeuserDesc
+            },
         )
         .setTimestamp(new Date())
 
@@ -468,6 +521,18 @@ async function handleInteraction(interaction) {
                     break;
                 case 'toggleweeklyshortsannouncements':
                     await handleToggleWeeklyShortsAnnouncements(interaction);
+                    break;
+                case 'setcampaignsearchtime':
+                    await handleSetCampaignSearchTime(interaction);
+                    break;
+                case 'setweeklyshortssearchtime':
+                    await handleSetWeeklyShortsSearchTime(interaction);
+                    break;
+                case 'authorizeuser':
+                    await handleAuthorizeUser(interaction);
+                    break;
+                case 'unauthorizeuser':
+                    await handleUnauthorizeUser(interaction);
                     break;
                 default:
                     await interaction.reply(t.responses.error.unknownCommand);
@@ -706,7 +771,238 @@ async function handleSetMinPosition(interaction) {
     }
 }
 
-import handleLeaderboardModule from './handleLeaderboard.js';
+/**
+ * Handles the /setcampaignsearchtime command to set the campaign search interval
+ * Authorized users only
+ * @param {Interaction} interaction - Discord interaction object
+ */
+async function handleSetCampaignSearchTime(interaction) {
+    const t = await getTranslations(interaction.guildId);
+
+    try {
+        if (!await isUserAuthorized(interaction.user.id)) {
+            return await interaction.reply({
+                content: t.responses.setcampaignsearchtime?.noPermission ||
+                    '❌ You are not authorized to modify global settings.',
+                ephemeral: true
+            });
+        }
+
+        await interaction.reply(t.responses.setcampaignsearchtime?.processing || '🔄 Setting campaign search interval...');
+        const minutes = interaction.options.getInteger('minutes');
+        const intervalMs = minutes * 60 * 1000;
+
+        const result = await setCampaignCheckInterval(intervalMs);
+
+        if (result) {
+            await restartCampaignSchedule();
+            
+            await interaction.editReply(
+                formatString(
+                    t.responses.setcampaignsearchtime?.success ||
+                    '✅ Campaign search interval has been set to {minutes} minutes.',
+                    { minutes: minutes.toString() }
+                )
+            );
+        } else {
+            await interaction.editReply(
+                t.responses.setcampaignsearchtime?.error ||
+                '❌ Failed to set the campaign search interval.'
+            );
+        }
+    } catch (error) {
+        log(`Error in setcampaignsearchtime command: ${error.message}`, 'error');
+        await interaction.editReply(
+            t.responses.setcampaignsearchtime?.error ||
+            '❌ An error occurred while setting the campaign search interval.'
+        );
+    }
+}
+
+/**
+ * Handles the /setweeklyshortssearchtime command to set the weekly shorts search interval
+ * Authorized users only
+ * @param {Interaction} interaction - Discord interaction object
+ */
+async function handleSetWeeklyShortsSearchTime(interaction) {
+    const t = await getTranslations(interaction.guildId);
+
+    try {
+        if (!await isUserAuthorized(interaction.user.id)) {
+            return await interaction.reply({
+                content: t.responses.setweeklyshortssearchtime?.noPermission ||
+                    '❌ You are not authorized to modify global settings.',
+                ephemeral: true
+            });
+        }
+
+        await interaction.reply(t.responses.setweeklyshortssearchtime?.processing || '🔄 Setting weekly shorts search interval...');
+        const minutes = interaction.options.getInteger('minutes');
+        const intervalMs = minutes * 60 * 1000;
+
+        const result = await setWeeklyShortsCheckInterval(intervalMs);
+
+        if (result) {
+            // Restart the weekly shorts check schedule with new interval
+            await restartWeeklyShortsSchedule();
+            
+            await interaction.editReply(
+                formatString(
+                    t.responses.setweeklyshortssearchtime?.success ||
+                    '✅ Weekly shorts search interval has been set to {minutes} minutes.',
+                    { minutes: minutes.toString() }
+                )
+            );
+        } else {
+            await interaction.editReply(
+                t.responses.setweeklyshortssearchtime?.error ||
+                '❌ Failed to set the weekly shorts search interval.'
+            );
+        }
+    } catch (error) {
+        log(`Error in setweeklyshortssearchtime command: ${error.message}`, 'error');
+        await interaction.editReply(
+            t.responses.setweeklyshortssearchtime?.error ||
+            '❌ An error occurred while setting the weekly shorts search interval.'
+        );
+    }
+}
+
+/**
+ * Handles the /authorizeuser command to authorize a user for global settings
+ * Authorized users only
+ * @param {Interaction} interaction - Discord interaction object
+ */
+async function handleAuthorizeUser(interaction) {
+    const t = await getTranslations(interaction.guildId);
+
+    try {
+        if (!await isUserAuthorized(interaction.user.id)) {
+            return await interaction.reply({
+                content: t.responses.authorizeuser?.noPermission ||
+                    '❌ You are not authorized to modify global settings.',
+                ephemeral: true
+            });
+        }
+
+        await interaction.reply(t.responses.authorizeuser?.processing || '🔄 Authorizing user...');
+        const user = interaction.options.getUser('user');
+
+        const result = await addAuthorizedUser(user.id);
+
+        if (result) {
+            await interaction.editReply(
+                formatString(
+                    t.responses.authorizeuser?.success ||
+                    '✅ {user} has been authorized to modify global settings.',
+                    { user: `<@${user.id}>` }
+                )
+            );
+        } else {
+            await interaction.editReply(
+                t.responses.authorizeuser?.error ||
+                '❌ Failed to authorize the user.'
+            );
+        }
+    } catch (error) {
+        log(`Error in authorizeuser command: ${error.message}`, 'error');
+        await interaction.editReply(
+            t.responses.authorizeuser?.error ||
+            '❌ An error occurred while authorizing the user.'
+        );
+    }
+}
+
+/**
+ * Handles the /unauthorizeuser command to remove user authorization
+ * Authorized users only
+ * @param {Interaction} interaction - Discord interaction object
+ */
+async function handleUnauthorizeUser(interaction) {
+    const t = await getTranslations(interaction.guildId);
+
+    try {
+        if (!await isUserAuthorized(interaction.user.id)) {
+            return await interaction.reply({
+                content: t.responses.unauthorizeuser?.noPermission ||
+                    '❌ You are not authorized to modify global settings.',
+                ephemeral: true
+            });
+        }
+
+        await interaction.reply(t.responses.unauthorizeuser?.processing || '🔄 Removing user authorization...');
+        const user = interaction.options.getUser('user');
+
+        const result = await removeAuthorizedUser(user.id);
+
+        if (result) {
+            await interaction.editReply(
+                formatString(
+                    t.responses.unauthorizeuser?.success ||
+                    '✅ {user} authorization has been removed.',
+                    { user: `<@${user.id}>` }
+                )
+            );
+        } else {
+            await interaction.editReply(
+                t.responses.unauthorizeuser?.error ||
+                '❌ Failed to remove user authorization.'
+            );
+        }
+    } catch (error) {
+        log(`Error in unauthorizeuser command: ${error.message}`, 'error');
+        await interaction.editReply(
+            t.responses.unauthorizeuser?.error ||
+            '❌ An error occurred while removing user authorization.'
+        );
+    }
+}
+
+let currentCampaignScheduleInterval = null;
+let currentWeeklyShortsScheduleInterval = null;
+
+/**
+ * Restart the campaign record checking schedule with updated interval
+ */
+async function restartCampaignSchedule() {
+    try {
+        clearSchedule('checkRecords');
+        const newInterval = await getCampaignCheckInterval();
+        currentCampaignScheduleInterval = newInterval;
+        
+        scheduleTask('checkRecords', newInterval, async () => {
+            recordCheckQueue.enqueue(async () => {
+                await import('./recordTracker.js').then(module => module.checkRecords(global.botClient));
+            }, 'scheduled record check');
+        });
+        
+        log(`Campaign record checking schedule restarted with ${newInterval}ms interval`);
+    } catch (error) {
+        log(`Error restarting campaign schedule: ${error.message}`, 'error');
+    }
+}
+
+/**
+ * Restart the weekly shorts checking schedule with updated interval
+ */
+async function restartWeeklyShortsSchedule() {
+    try {
+        clearSchedule('checkWeeklyShorts');
+        const newInterval = await getWeeklyShortsCheckInterval();
+        currentWeeklyShortsScheduleInterval = newInterval;
+        
+        scheduleTask('checkWeeklyShorts', newInterval, async () => {
+            recordCheckQueue.enqueue(async () => {
+                const maxPosition = process.env.WEEKLY_SHORTS_MAX_POSITION || 10000;
+                await import('./weeklyShorts.js').then(module => module.checkWeeklyShorts(global.botClient, maxPosition));
+            }, 'scheduled weekly shorts check');
+        });
+        
+        log(`Weekly shorts checking schedule restarted with ${newInterval}ms interval`);
+    } catch (error) {
+        log(`Error restarting weekly shorts schedule: ${error.message}`, 'error');
+    }
+}
 
 /**
  * Handles the /togglecampaignannouncements command to enable/disable campaign announcements
@@ -1018,17 +1314,24 @@ export function initBot() {
         log(`Bot logged in as ${client.user.tag} (ID: ${clientId})`);
         log(`Bot is in ${client.guilds.cache.size} servers`);
 
+        global.botClient = client;
+
         await registerCommands(clientId);
 
         startDefaultSchedules(client);
 
-        scheduleTask('checkRecords', RECORD_CHECK_INTERVAL, async () => {
+        const campaignInterval = await getCampaignCheckInterval();
+        const weeklyShortsInterval = await getWeeklyShortsCheckInterval();
+        
+        log(`Starting record checking with campaign interval: ${campaignInterval}ms, weekly shorts interval: ${weeklyShortsInterval}ms`);
+
+        scheduleTask('checkRecords', campaignInterval, async () => {
             recordCheckQueue.enqueue(async () => {
                 await import('./recordTracker.js').then(module => module.checkRecords(client));
             }, 'scheduled record check');
         });
 
-        scheduleTask('checkWeeklyShorts', WEEKLY_SHORTS_CHECK_INTERVAL, async () => {
+        scheduleTask('checkWeeklyShorts', weeklyShortsInterval, async () => {
             recordCheckQueue.enqueue(async () => {
                 const maxPosition = process.env.WEEKLY_SHORTS_MAX_POSITION || 10000;
                 await import('./weeklyShorts.js').then(module => module.checkWeeklyShorts(client, maxPosition));

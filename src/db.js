@@ -3,6 +3,7 @@ import sqlite3 from 'sqlite3';
 import fs from 'fs';
 import path from 'path';
 import dotenv from 'dotenv';
+import { log } from './utils.js';
 
 dotenv.config();
 
@@ -145,6 +146,15 @@ export async function initDatabase() {
       UNIQUE(guild_id, record_id),
       UNIQUE(guild_id, weekly_short_record_id)
     );
+    
+    CREATE TABLE IF NOT EXISTS global_settings (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      campaign_check_interval_ms INTEGER DEFAULT 900000,
+      weekly_shorts_check_interval_ms INTEGER DEFAULT 1080000,
+      authorized_users TEXT DEFAULT '',
+      created_at TIMESTAMP DEFAULT (datetime('now')),
+      updated_at TIMESTAMP DEFAULT (datetime('now'))
+    );
   `);
 
     return db;
@@ -162,4 +172,145 @@ export async function getDb() {
         dbInstance = await initDatabase();
     }
     return dbInstance;
+}
+
+/**
+ * Gets the global settings, creating a default row if none exists
+ * @returns {Promise<Object>} Global settings object
+ */
+export async function getGlobalSettings() {
+    const db = await getDb();
+    
+    let settings = await db.get('SELECT * FROM global_settings WHERE id = 1');
+    
+    if (!settings) {
+        await db.run(`
+            INSERT INTO global_settings (
+                campaign_check_interval_ms, 
+                weekly_shorts_check_interval_ms,
+                authorized_users
+            ) VALUES (?, ?, ?)
+        `, [900000, 1080000, '']);
+        
+        settings = await db.get('SELECT * FROM global_settings WHERE id = 1');
+    }
+    
+    return settings;
+}
+
+/**
+ * Updates the campaign check interval
+ * @param {number} intervalMs - New interval in milliseconds
+ * @returns {Promise<boolean>} Success status
+ */
+export async function setCampaignCheckInterval(intervalMs) {
+    try {
+        const db = await getDb();
+        await getGlobalSettings();
+        
+        await db.run(`
+            UPDATE global_settings 
+            SET campaign_check_interval_ms = ?, updated_at = datetime('now')
+            WHERE id = 1
+        `, [intervalMs]);
+        
+        return true;
+    } catch (error) {
+        log(`Error setting campaign check interval: ${error.message}`, 'error');
+        return false;
+    }
+}
+
+/**
+ * Updates the weekly shorts check interval
+ * @param {number} intervalMs - New interval in milliseconds
+ * @returns {Promise<boolean>} Success status
+ */
+export async function setWeeklyShortsCheckInterval(intervalMs) {
+    try {
+        const db = await getDb();
+        await getGlobalSettings();
+        
+        await db.run(`
+            UPDATE global_settings 
+            SET weekly_shorts_check_interval_ms = ?, updated_at = datetime('now')
+            WHERE id = 1
+        `, [intervalMs]);
+        
+        return true;
+    } catch (error) {
+        log(`Error setting weekly shorts check interval: ${error.message}`, 'error');
+        return false;
+    }
+}
+
+/**
+ * Adds an authorized user for global settings management
+ * @param {string} userId - Discord user ID to authorize
+ * @returns {Promise<boolean>} Success status
+ */
+export async function addAuthorizedUser(userId) {
+    try {
+        const db = await getDb();
+        const settings = await getGlobalSettings();
+        
+        const authorizedUsers = settings.authorized_users ? settings.authorized_users.split(',').filter(Boolean) : [];
+        
+        if (!authorizedUsers.includes(userId)) {
+            authorizedUsers.push(userId);
+            
+            await db.run(`
+                UPDATE global_settings 
+                SET authorized_users = ?, updated_at = datetime('now')
+                WHERE id = 1
+            `, [authorizedUsers.join(',')]);
+        }
+        
+        return true;
+    } catch (error) {
+        log(`Error adding authorized user: ${error.message}`, 'error');
+        return false;
+    }
+}
+
+/**
+ * Removes an authorized user
+ * @param {string} userId - Discord user ID to remove
+ * @returns {Promise<boolean>} Success status
+ */
+export async function removeAuthorizedUser(userId) {
+    try {
+        const db = await getDb();
+        const settings = await getGlobalSettings();
+        
+        const authorizedUsers = settings.authorized_users ? settings.authorized_users.split(',').filter(Boolean) : [];
+        const filtered = authorizedUsers.filter(id => id !== userId);
+        
+        await db.run(`
+            UPDATE global_settings 
+            SET authorized_users = ?, updated_at = datetime('now')
+            WHERE id = 1
+        `, [filtered.join(',')]);
+        
+        return true;
+    } catch (error) {
+        log(`Error removing authorized user: ${error.message}`, 'error');
+        return false;
+    }
+}
+
+/**
+ * Checks if a user is authorized to modify global settings
+ * @param {string} userId - Discord user ID to check
+ * @returns {Promise<boolean>} Authorization status
+ */
+export async function isUserAuthorized(userId) {
+    try {
+        const settings = await getGlobalSettings();
+        const authorizedUsers = settings.authorized_users ? settings.authorized_users.split(',').filter(Boolean) : [];
+        return authorizedUsers.includes(userId);
+    } catch (error) {
+        log(`Error checking user authorization: ${error.message}`, 'error');
+        return false;
+    }
 }

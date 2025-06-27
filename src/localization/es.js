@@ -28,7 +28,15 @@ export default {
         togglecampaignannouncements: 'Activar o desactivar anuncios de récords de campaña',
         togglecampaignannouncementsOption: 'Activar o desactivar anuncios de campaña',
         toggleweeklyshortsannouncements: 'Activar o desactivar anuncios de weekly shorts',
-        toggleweeklyshortsannouncementsOption: 'Activar o desactivar anuncios de weekly shorts'
+        toggleweeklyshortsannouncementsOption: 'Activar o desactivar anuncios de weekly shorts',
+        setcampaignsearchtime: 'Establecer el intervalo de búsqueda de campaña (solo usuarios autorizados)',
+        setcampaignsearchtimeOption: 'Intervalo de búsqueda en minutos (5-1440)',
+        setweeklyshortssearchtime: 'Establecer el intervalo de búsqueda de weekly shorts (solo usuarios autorizados)',
+        setweeklyshortssearchtimeOption: 'Intervalo de búsqueda en minutos (5-1440)',
+        authorizeuser: 'Autorizar a un usuario para modificar configuraciones globales (solo usuarios autorizados)',
+        authorizeuserOption: 'Usuario a autorizar',
+        unauthorizeuser: 'Quitar autorización de usuario para configuraciones globales (solo usuarios autorizados)',
+        unauthorizeuserOption: 'Usuario a desautorizar'
     },
 
     // Command responses
@@ -117,6 +125,30 @@ export default {
             enabledStatus: 'activados',
             disabledStatus: 'desactivados',
             processing: '🔄 Actualizando la configuración de anuncios de weekly shorts...'
+        },
+        setcampaignsearchtime: {
+            noPermission: '❌ No estás autorizado para modificar configuraciones globales.',
+            success: '✅ El intervalo de búsqueda de campaña se ha establecido a {minutes} minutos.',
+            error: '❌ No se pudo establecer el intervalo de búsqueda de campaña.',
+            processing: '🔄 Estableciendo intervalo de búsqueda de campaña...'
+        },
+        setweeklyshortssearchtime: {
+            noPermission: '❌ No estás autorizado para modificar configuraciones globales.',
+            success: '✅ El intervalo de búsqueda de weekly shorts se ha establecido a {minutes} minutos.',
+            error: '❌ No se pudo establecer el intervalo de búsqueda de weekly shorts.',
+            processing: '🔄 Estableciendo intervalo de búsqueda de weekly shorts...'
+        },
+        authorizeuser: {
+            noPermission: '❌ No estás autorizado para modificar configuraciones globales.',
+            success: '✅ {user} ha sido autorizado para modificar configuraciones globales.',
+            error: '❌ No se pudo autorizar al usuario.',
+            processing: '🔄 Autorizando usuario...'
+        },
+        unauthorizeuser: {
+            noPermission: '❌ No estás autorizado para modificar configuraciones globales.',
+            success: '✅ La autorización de {user} ha sido eliminada.',
+            error: '❌ No se pudo eliminar la autorización del usuario.',
+            processing: '🔄 Eliminando autorización del usuario...'
         },
         error: {
             unknown: 'Ocurrió un error al procesar este comando.',

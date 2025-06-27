@@ -59,19 +59,35 @@ USER_AGENT=App name / @user / user@user.com
 npm start
 ```
 
+5. Set up authorized users for global settings (Optional):
+```bash
+node setup-authorized-user.js [YOUR_DISCORD_USER_ID]
+```
+
 ## Commands
 
+### Player Commands
 - `/register <account_id>` - Link your Discord account to your Trackmania account
 - `/unregister` - Unlink your account
 - `/records` - View your recent records
 - `/leaderboard [map] [country]` - View campaign or map leaderboards
 - `/weeklyshortsleaderboard [map] [country]` - View weekly shorts leaderboard (overall or specific map)
-- `/setcountry <country>` - Set default country for leaderboards (Admin/Mod only)
-- `/language <lang>` - Change bot language (Admin/Mod only)
-- `/setchannel <channel>` - Set announcement channel for records (Admin/Mod only)
-- `/setweeklyshortschannel <channel>` - Set announcement channel for weekly shorts (Admin/Mod only)
-- `/setminposition <position>` - Set minimum world position to announce records (Admin/Mod only)
 - `/help` - Show all available commands
+
+### Server Management (Admin/Mod only)
+- `/setcountry <country>` - Set default country for leaderboards
+- `/language <lang>` - Change bot language
+- `/setchannel <channel>` - Set announcement channel for records
+- `/setweeklyshortschannel <channel>` - Set announcement channel for weekly shorts
+- `/setminposition <position>` - Set minimum world position to announce records
+- `/togglecampaignannouncements <enabled>` - Enable/disable campaign announcements
+- `/toggleweeklyshortsannouncements <enabled>` - Enable/disable weekly shorts announcements
+
+### Global Settings (Authorized users only)
+- `/setcampaignsearchtime <minutes>` - Set campaign search interval (5-60 minutes)
+- `/setweeklyshortssearchtime <minutes>` - Set weekly shorts search interval (5-60 minutes)
+- `/authorizeuser <user>` - Authorize a user to modify global settings
+- `/unauthorizeuser <user>` - Remove user authorization for global settings
 
 ## Acknowledgments
 

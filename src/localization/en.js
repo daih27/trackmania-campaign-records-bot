@@ -28,7 +28,15 @@ export default {
         togglecampaignannouncements: 'Toggle campaign record announcements',
         togglecampaignannouncementsOption: 'Enable or disable campaign announcements',
         toggleweeklyshortsannouncements: 'Toggle weekly shorts announcements',
-        toggleweeklyshortsannouncementsOption: 'Enable or disable weekly shorts announcements'
+        toggleweeklyshortsannouncementsOption: 'Enable or disable weekly shorts announcements',
+        setcampaignsearchtime: 'Set the campaign search interval (authorized users only)',
+        setcampaignsearchtimeOption: 'Search interval in minutes (5-1440)',
+        setweeklyshortssearchtime: 'Set the weekly shorts search interval (authorized users only)',
+        setweeklyshortssearchtimeOption: 'Search interval in minutes (5-1440)',
+        authorizeuser: 'Authorize a user to modify global settings (authorized users only)',
+        authorizeuserOption: 'User to authorize',
+        unauthorizeuser: 'Remove user authorization for global settings (authorized users only)',
+        unauthorizeuserOption: 'User to unauthorize'
     },
 
     // Command responses
@@ -118,6 +126,30 @@ export default {
             disabledStatus: 'disabled',
             processing: '🔄 Updating weekly shorts announcement settings...'
         },
+        setcampaignsearchtime: {
+            noPermission: '❌ You are not authorized to modify global settings.',
+            success: '✅ Campaign search interval has been set to {minutes} minutes.',
+            error: '❌ Failed to set the campaign search interval.',
+            processing: '🔄 Setting campaign search interval...'
+        },
+        setweeklyshortssearchtime: {
+            noPermission: '❌ You are not authorized to modify global settings.',
+            success: '✅ Weekly shorts search interval has been set to {minutes} minutes.',
+            error: '❌ Failed to set the weekly shorts search interval.',
+            processing: '🔄 Setting weekly shorts search interval...'
+        },
+        authorizeuser: {
+            noPermission: '❌ You are not authorized to modify global settings.',
+            success: '✅ {user} has been authorized to modify global settings.',
+            error: '❌ Failed to authorize the user.',
+            processing: '🔄 Authorizing user...'
+        },
+        unauthorizeuser: {
+            noPermission: '❌ You are not authorized to modify global settings.',
+            success: '✅ {user} authorization has been removed.',
+            error: '❌ Failed to remove user authorization.',
+            processing: '🔄 Removing user authorization...'
+        },
         error: {
             unknown: 'An error occurred while processing this command.',
             unknownCommand: 'Unknown command.'
@@ -179,6 +211,14 @@ export default {
             togglecampaignannouncementsDesc: 'Enable or disable campaign record announcements (admin/mod only)',
             toggleweeklyshortsannouncements: '🔔 /toggleweeklyshortsannouncements',
             toggleweeklyshortsannouncementsDesc: 'Enable or disable weekly shorts announcements (admin/mod only)',
+            setcampaignsearchtime: '⏰ /setcampaignsearchtime',
+            setcampaignsearchtimeDesc: 'Set the campaign search interval (authorized users only)',
+            setweeklyshortssearchtime: '⏰ /setweeklyshortssearchtime',
+            setweeklyshortssearchtimeDesc: 'Set the weekly shorts search interval (authorized users only)',
+            authorizeuser: '🔑 /authorizeuser',
+            authorizeuserDesc: 'Authorize a user to modify global settings (authorized users only)',
+            unauthorizeuser: '🔒 /unauthorizeuser',
+            unauthorizeuserDesc: 'Remove user authorization for global settings (authorized users only)',
         },
         newRecord: {
             title: '{emoji} New PB!',
