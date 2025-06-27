@@ -223,10 +223,14 @@ export async function getZoneName(zoneId) {
  */
 export async function getAvailableCountries() {
     const countries = await getCountries();
-    return countries.map(country => ({
-        name: country.name,
-        value: country.id
-    }));
+    const choices = [
+        { name: '🌍 World', value: 'world' },
+        ...countries.map(country => ({
+            name: country.name,
+            value: country.id
+        }))
+    ];
+    return choices;
 }
 
 /**

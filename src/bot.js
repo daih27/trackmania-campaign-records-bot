@@ -18,6 +18,7 @@ import {
     createWeeklyShortMapLeaderboardEmbed
 } from './weeklyShorts.js';
 import { fetchMapInfo, fetchPlayerNames } from './recordTracker.js';
+import handleLeaderboard from './handleLeaderboard.js';
 
 /**
  * Defines all available slash commands for the Discord bot with their options and descriptions
@@ -493,7 +494,7 @@ async function handleInteraction(interaction) {
                     await handleRecords(interaction);
                     break;
                 case 'leaderboard':
-                    await handleLeaderboardModule(interaction);
+                    await handleLeaderboard(interaction);
                     break;
                 case 'help':
                     await handleHelp(interaction);
@@ -1176,7 +1177,7 @@ async function showWeeklyShortOverallLeaderboard(interaction, countryCode, t) {
         const overallRecords = await fetchWeeklyShortSeasonLeaderboard(seasonUid, countryCode, 5);
 
         if (overallRecords.length === 0) {
-            const countryName = await getZoneName(countryCode);
+            const countryName = countryCode === 'world' ? 'World' : await getZoneName(countryCode);
             return await interaction.editReply(
                 t.responses.weeklyshortsleaderboard?.noSeasonRecords ||
                 `No ${countryName} players found in the current weekly shorts.`
@@ -1267,7 +1268,7 @@ async function showWeeklyShortMapLeaderboard(interaction, mapName, countryCode, 
         );
 
         if (mapRecords.length === 0) {
-            const countryName = await getZoneName(countryCode);
+            const countryName = countryCode === 'world' ? 'World' : await getZoneName(countryCode);
             return await interaction.editReply(
                 formatString(t.responses.weeklyshortsleaderboard?.noCountryRecords ||
                     'No records found for {country} in {mapName}.',

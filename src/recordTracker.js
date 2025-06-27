@@ -21,7 +21,7 @@ import { getMinWorldPosition } from './guildSettings.js';
  * @returns {Promise<EmbedBuilder>} Discord embed for the season leaderboard
  */
 export async function createSeasonLeaderboardEmbed(seasonName, countryCode, records, playerNames, t) {
-    const countryName = await getZoneName(countryCode);
+    const countryName = countryCode === 'world' ? 'World' : await getZoneName(countryCode);
     const embed = new EmbedBuilder()
         .setTitle(formatString(t.embeds.seasonLeaderboard?.title || '🏆 {country} Season Leaderboard: {season}', {
             country: countryName,
@@ -73,6 +73,22 @@ export async function createSeasonLeaderboardEmbed(seasonName, countryCode, reco
  */
 export async function fetchSeasonLeaderboard(seasonUid, countryCode, limit = 5) {
     const liveToken = await ensureToken('NadeoLiveServices');
+
+    if (countryCode === 'world') {
+        const leaderboardRes = await makeRateLimitedRequest({
+            method: 'get',
+            url: `https://live-services.trackmania.nadeo.live/api/token/leaderboard/group/${seasonUid}/top?length=${limit}&onlyWorld=true&offset=0`,
+            headers: { Authorization: `nadeo_v1 t=${liveToken}` }
+        });
+
+        if (!leaderboardRes.data?.tops || !leaderboardRes.data.tops[0]?.top?.length) {
+            return [];
+        }
+
+        const worldTop = leaderboardRes.data.tops[0].top.slice(0, limit);
+        log(`Found ${worldTop.length} players in world season leaderboard`);
+        return worldTop;
+    }
 
     const zoneNames = await getZoneNamesForCountry(countryCode);
     if (zoneNames.size === 0) {
@@ -237,6 +253,22 @@ export async function fetchPlayerRecords(mapId, accountIds) {
  */
 export async function fetchCountryLeaderboard(mapUid, countryCode, length = 5) {
     const liveToken = await ensureToken('NadeoLiveServices');
+
+    if (countryCode === 'world') {
+        const leaderboardRes = await makeRateLimitedRequest({
+            method: 'get',
+            url: `https://live-services.trackmania.nadeo.live/api/token/leaderboard/group/Personal_Best/map/${mapUid}/top?length=${length}&onlyWorld=true&offset=0`,
+            headers: { Authorization: `nadeo_v1 t=${liveToken}` }
+        });
+
+        if (!leaderboardRes.data?.tops || !leaderboardRes.data.tops[0]?.top?.length) {
+            return [];
+        }
+
+        const worldTop = leaderboardRes.data.tops[0].top.slice(0, length);
+        log(`Found ${worldTop.length} players in world leaderboard`);
+        return worldTop;
+    }
 
     const zoneNames = await getZoneNamesForCountry(countryCode);
     if (zoneNames.size === 0) {
@@ -930,7 +962,7 @@ export function createRecordEmbed(record, t, worldPosition = null) {
  * @returns {Promise<EmbedBuilder>} The embed to display
  */
 export async function createCountryLeaderboardEmbed(mapName, mapUid, thumbnailUrl, countryCode, records, playerNames, t) {
-    const countryName = await getZoneName(countryCode);
+    const countryName = countryCode === 'world' ? 'World' : await getZoneName(countryCode);
     const embed = new EmbedBuilder()
         .setTitle(formatString(t.embeds.countryLeaderboard.title, { mapName: mapName || mapUid, country: countryName }))
         .setColor(0x00BFFF)

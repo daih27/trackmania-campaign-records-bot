@@ -105,7 +105,7 @@ async function handleLeaderboard(interaction) {
                 return;
             }
 
-            const countryName = await getZoneName(countryCode);
+            const countryName = countryCode === 'world' ? 'World' : await getZoneName(countryCode);
             return await interaction.editReply(formatString(t.responses.leaderboard.noCountryRecords, { mapName: map.name || map.map_uid, country: countryName }));
 
         }
@@ -138,7 +138,7 @@ async function handleLeaderboard(interaction) {
 
                 await interaction.editReply({ content: null, embeds: [embed] });
             } else {
-                const countryName = await getZoneName(countryCode);
+                const countryName = countryCode === 'world' ? 'World' : await getZoneName(countryCode);
                 await interaction.editReply(formatString(
                     t.responses.leaderboard.noSeasonRecords || 'No {country} players found in the current season leaderboard.',
                     { country: countryName }

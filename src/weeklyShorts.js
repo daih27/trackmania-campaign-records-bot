@@ -32,6 +32,22 @@ export function cleanMapName(mapName) {
 export async function fetchWeeklyShortSeasonLeaderboard(seasonUid, countryCode, limit = 5) {
     const liveToken = await ensureToken('NadeoLiveServices');
 
+    if (countryCode === 'world') {
+        const leaderboardRes = await makeRateLimitedRequest({
+            method: 'get',
+            url: `https://live-services.trackmania.nadeo.live/api/token/leaderboard/group/${seasonUid}/top?length=${limit}&onlyWorld=true&offset=0`,
+            headers: { Authorization: `nadeo_v1 t=${liveToken}` }
+        });
+
+        if (!leaderboardRes.data?.tops || !leaderboardRes.data.tops[0]?.top?.length) {
+            return [];
+        }
+
+        const worldTop = leaderboardRes.data.tops[0].top.slice(0, limit);
+        log(`Found ${worldTop.length} players in world weekly short season leaderboard`);
+        return worldTop;
+    }
+
     const zoneNames = await getZoneNamesForCountry(countryCode);
     if (zoneNames.size === 0) {
         const countryName = await getZoneName(countryCode);
@@ -83,6 +99,22 @@ export async function fetchWeeklyShortSeasonLeaderboard(seasonUid, countryCode, 
  */
 export async function fetchWeeklyShortCountryLeaderboard(mapUid, seasonUid, countryCode, limit = 5) {
     const liveToken = await ensureToken('NadeoLiveServices');
+
+    if (countryCode === 'world') {
+        const leaderboardRes = await makeRateLimitedRequest({
+            method: 'get',
+            url: `https://live-services.trackmania.nadeo.live/api/token/leaderboard/group/${seasonUid}/map/${mapUid}/top?length=${limit}&onlyWorld=true&offset=0`,
+            headers: { Authorization: `nadeo_v1 t=${liveToken}` }
+        });
+
+        if (!leaderboardRes.data?.tops || !leaderboardRes.data.tops[0]?.top?.length) {
+            return [];
+        }
+
+        const worldTop = leaderboardRes.data.tops[0].top.slice(0, limit);
+        log(`Found ${worldTop.length} players in world weekly short map leaderboard`);
+        return worldTop;
+    }
 
     const zoneNames = await getZoneNamesForCountry(countryCode);
     if (zoneNames.size === 0) {
@@ -156,7 +188,7 @@ export async function getWeeklyShortMapFromDb(mapUid) {
  * @returns {Promise<EmbedBuilder>} Discord embed for the season leaderboard
  */
 export async function createWeeklyShortSeasonLeaderboardEmbed(seasonName, countryCode, records, playerNames, t) {
-    const countryName = await getZoneName(countryCode);
+    const countryName = countryCode === 'world' ? 'World' : await getZoneName(countryCode);
     const embed = new EmbedBuilder()
         .setTitle(t.embeds.seasonLeaderboard.title
             .replace('{country}', countryName)
@@ -210,7 +242,7 @@ export async function createWeeklyShortSeasonLeaderboardEmbed(seasonName, countr
  * @returns {Promise<EmbedBuilder>} Discord embed for the map leaderboard
  */
 export async function createWeeklyShortMapLeaderboardEmbed(mapName, mapUid, thumbnailUrl, countryCode, records, playerNames, t) {
-    const countryName = await getZoneName(countryCode);
+    const countryName = countryCode === 'world' ? 'World' : await getZoneName(countryCode);
     const embed = new EmbedBuilder()
         .setTitle(t.embeds.countryLeaderboard.title
             .replace('{country}', countryName)
