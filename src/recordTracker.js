@@ -86,7 +86,7 @@ export async function fetchSeasonLeaderboard(seasonUid, countryCode, limit = 5) 
         }
 
         const worldTop = leaderboardRes.data.tops[0].top.slice(0, limit);
-        log(`Found ${worldTop.length} players in world season leaderboard`);
+        log(`Found ${worldTop.length} players in world season leaderboard`, 'debug');
         return worldTop;
     }
 
@@ -98,8 +98,7 @@ export async function fetchSeasonLeaderboard(seasonUid, countryCode, limit = 5) 
     }
 
     const countryName = await getZoneName(countryCode);
-    log(`Fetching season leaderboard for ${countryName} (zones: ${Array.from(zoneNames).join(', ')})`);
-
+    log(`Fetching season leaderboard for ${countryName} (zones: ${Array.from(zoneNames).join(', ')})`, 'debug');
     let countryRecords = [];
     let offset = 0;
     const maxOffset = 10000;

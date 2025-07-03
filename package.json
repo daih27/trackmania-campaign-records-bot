@@ -6,7 +6,12 @@
   "type": "module",
   "scripts": {
     "start": "node src/index.js",
-    "dev": "nodemon src/index.js"
+    "start:quiet": "LOG_LEVEL=warn node src/index.js",
+    "start:minimal": "LOG_LEVEL=error node src/index.js",
+    "start:silent": "LOG_LEVEL=silent node src/index.js",
+    "start:debug": "LOG_LEVEL=debug node src/index.js",
+    "dev": "nodemon src/index.js",
+    "dev:quiet": "LOG_LEVEL=warn nodemon src/index.js"
   },
   "keywords": [
     "discord",

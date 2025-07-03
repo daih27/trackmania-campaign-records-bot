@@ -1,6 +1,7 @@
 import { initDatabase, getDb } from './db.js';
 import { initBot } from './bot.js';
-import { log } from './utils.js';
+import { log, setLogLevel } from './utils.js';
+import { setupLogCleanup } from './utils/logRotation.js';
 import fs from 'fs';
 import path from 'path';
 
@@ -43,6 +44,13 @@ function initializeLogging() {
 }
 
 const logStream = initializeLogging();
+
+const logLevel = process.env.LOG_LEVEL || 'warn';
+setLogLevel(logLevel);
+log(`Log level set to: ${logLevel}`, 'info');
+
+const logsDir = path.join(process.cwd(), 'logs');
+setupLogCleanup(logsDir);
 
 /**
  * Sets up process-level error handlers for uncaught exceptions and unhandled promise rejections
@@ -150,8 +158,9 @@ async function initializeApp() {
 initializeApp();
 
 /**
- * Watchdog timer that logs a heartbeat message every hour to confirm the application is still running
+ * Watchdog timer that logs a heartbeat message every 6 hours to confirm the application is still running
+ * Set to debug level to reduce log noise - only appears when LOG_LEVEL is set to debug
  */
 setInterval(() => {
-    log('Watchdog timer triggered - application is still running', 'info');
-}, 3600000);
+    log('Application heartbeat - still running', 'debug');
+}, 6 * 3600000);
