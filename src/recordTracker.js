@@ -146,6 +146,9 @@ export async function fetchCurrentCampaign() {
 
     const campaign = campRes.data.campaignList[0];
     log(`Using campaign: ${campaign.name}`);
+    log(`Campaign leaderboardGroupUid: ${campaign.leaderboardGroupUid}`);
+    log(`Campaign seasonUid: ${campaign.seasonUid}`);
+    log(`Campaign playlist length: ${campaign.playlist?.length || 0}`);
 
     return campaign;
 }
@@ -338,7 +341,7 @@ export async function fetchPlayerNames(accountIds) {
  * @param {string|number|Date} recordTimestamp - When the record was set
  * @returns {Object} Result object indicating if record was improved or is new
  */
-async function updateMapRecord(db, playerId, mapId, timeMs, playerRegisteredAt, recordTimestamp) {
+async function updateMapRecord(db, playerId, mapId, timeMs, playerRegisteredAt, recordTimestamp, useTimeComparison = true) {
     try {
         const currentRecord = await db.get(
             'SELECT time_ms, recorded_at FROM records WHERE player_id = ? AND map_id = ?',
@@ -377,15 +380,19 @@ async function updateMapRecord(db, playerId, mapId, timeMs, playerRegisteredAt, 
         }
 
         if (!currentRecord) {
-            await db.run(
-                `INSERT INTO record_history (player_id, map_id, time_ms, previous_time_ms) 
-                 VALUES (?, ?, ?, ?)`,
-                [playerId, mapId, timeMs, null]
-            );
+            try {
+                await db.run(
+                    `INSERT INTO record_history (player_id, map_id, time_ms, previous_time_ms) 
+                     VALUES (?, ?, ?, ?)`,
+                    [playerId, mapId, timeMs, null]
+                );
+            } catch (historyError) {
+                log(`Warning: Failed to insert record history for player ${playerId} on map ${mapId}: ${historyError.message}`, 'warn');
+            }
 
             const result = await db.run(
-                `INSERT INTO records (player_id, map_id, time_ms, announced) 
-                 VALUES (?, ?, ?, 0)`,
+                `INSERT INTO records (player_id, map_id, time_ms, recorded_at, announced) 
+                 VALUES (?, ?, ?, datetime('now', 'utc'), 0)`,
                 [playerId, mapId, timeMs]
             );
 
@@ -403,17 +410,26 @@ async function updateMapRecord(db, playerId, mapId, timeMs, playerRegisteredAt, 
             };
         }
         else {
-            const currentRecordDate = currentRecord.recorded_at ? new Date(currentRecord.recorded_at + 'Z') : new Date(0);
+            // Parse database timestamp correctly - SQLite stores in UTC when using datetime('now', 'utc')
+            const currentRecordDate = currentRecord.recorded_at ? 
+                new Date(currentRecord.recorded_at + 'Z') : 
+                new Date(0);
+            
+            // Compare timestamps: Trackmania only submits records when they're improvements
             if (recordDate > currentRecordDate) {
-                await db.run(
-                    `INSERT INTO record_history (player_id, map_id, time_ms, previous_time_ms) 
-                     VALUES (?, ?, ?, ?)`,
-                    [playerId, mapId, timeMs, currentRecord.time_ms]
-                );
+                try {
+                    await db.run(
+                        `INSERT INTO record_history (player_id, map_id, time_ms, previous_time_ms) 
+                         VALUES (?, ?, ?, ?)`,
+                        [playerId, mapId, timeMs, currentRecord.time_ms]
+                    );
+                } catch (historyError) {
+                    log(`Warning: Failed to insert record history for player ${playerId} on map ${mapId}: ${historyError.message}`, 'warn');
+                }
 
                 await db.run(
                     `UPDATE records 
-                     SET time_ms = ?, recorded_at = datetime('now'), announced = 0
+                     SET time_ms = ?, recorded_at = datetime('now', 'utc'), announced = 0
                      WHERE player_id = ? AND map_id = ?`,
                     [timeMs, playerId, mapId]
                 );
@@ -424,7 +440,7 @@ async function updateMapRecord(db, playerId, mapId, timeMs, playerRegisteredAt, 
                 );
 
                 const existedBeforeRegistration = recordDate < regDate;
-                log(`Updated record for player ${playerId} on map ${mapId}: ${timeMs}ms (was ${currentRecord.time_ms}ms, timestamp: ${recordDate.toISOString()}, pre-existing: ${existedBeforeRegistration})`);
+                log(`Improved record for player ${playerId} on map ${mapId}: ${timeMs}ms (was ${currentRecord.time_ms}ms, API: ${recordDate.toISOString()}, DB: ${currentRecordDate.toISOString()}, pre-existing: ${existedBeforeRegistration})`);
 
                 return {
                     improved: true,
@@ -434,7 +450,7 @@ async function updateMapRecord(db, playerId, mapId, timeMs, playerRegisteredAt, 
                     existedBeforeRegistration: existedBeforeRegistration
                 };
             } else {
-                log(`No timestamp update for player ${playerId} on map ${mapId}: current timestamp ${currentRecordDate.toISOString()} >= new timestamp ${recordDate.toISOString()}`);
+                log(`No improvement for player ${playerId} on map ${mapId}: API timestamp ${recordDate.toISOString()} <= DB timestamp ${currentRecordDate.toISOString()}`);
             }
         }
         return {
@@ -514,6 +530,7 @@ async function getUnannouncedRecords(db, guildId = null) {
       m.name as map_name, 
       m.thumbnail_url,
       r.time_ms,
+      r.recorded_at,
       rh.previous_time_ms
     FROM 
       records r
@@ -538,13 +555,14 @@ async function getUnannouncedRecords(db, guildId = null) {
 
     if (guildId) {
         query += `
+      AND p.guild_id = ?
       AND NOT EXISTS (
         SELECT 1 FROM guild_announcement_status gas
         WHERE gas.record_id = r.id 
         AND gas.guild_id = ?
         AND (gas.ineligible_for_announcement = 1 OR gas.existed_before_registration = 1)
       )`;
-        params.push(guildId);
+        params.push(guildId, guildId);
     }
 
     query += `
@@ -599,16 +617,36 @@ async function getUnannouncedRecords(db, guildId = null) {
 async function markRecordsAsAnnounced(db, recordIds) {
     if (recordIds.length === 0) return;
 
-    const placeholders = recordIds.map(() => '?').join(',');
-    await db.run(
-        `UPDATE records SET announced = 1 WHERE id IN (${placeholders})`,
-        recordIds
-    );
-
-    await db.run(
-        `DELETE FROM guild_announcement_status WHERE record_id IN (${placeholders})`,
-        recordIds
-    );
+    try {
+        const placeholders = recordIds.map(() => '?').join(',');
+        
+        await db.run('BEGIN TRANSACTION');
+        
+        const updateResult = await db.run(
+            `UPDATE records SET announced = 1 WHERE id IN (${placeholders})`,
+            recordIds
+        );
+        
+        log(`Marked ${updateResult.changes} records as announced: [${recordIds.join(', ')}]`);
+        
+        const deleteResult = await db.run(
+            `DELETE FROM guild_announcement_status WHERE record_id IN (${placeholders})`,
+            recordIds
+        );
+        
+        log(`Cleaned up ${deleteResult.changes} guild announcement status entries`);
+        
+        await db.run('COMMIT');
+        
+    } catch (error) {
+        log(`Error marking records as announced: ${error.message}`, 'error');
+        try {
+            await db.run('ROLLBACK');
+        } catch (rollbackError) {
+            log(`Error rolling back transaction: ${rollbackError.message}`, 'error');
+        }
+        throw error;
+    }
 }
 
 /**
@@ -889,7 +927,9 @@ export function createRecordEmbed(record, t, worldPosition = null) {
     let emoji = '🏆';
 
     const recordType = isImprovement ? t.embeds.newRecord.newPersonalBest : t.embeds.newRecord.firstRecord;
-    const now = new Date();
+    
+    // Use the actual record timestamp instead of current time
+    const recordTimestamp = record.recorded_at ? new Date(record.recorded_at + 'Z') : new Date();
 
     const finalThumbnailUrl = record.thumbnail_url && record.thumbnail_url.startsWith('http') ? record.thumbnail_url : null;
     const embed = new EmbedBuilder()
@@ -938,11 +978,11 @@ export function createRecordEmbed(record, t, worldPosition = null) {
         );
     }
 
-    embed.setTimestamp(new Date())
+    embed.setTimestamp(recordTimestamp)
         .setFooter({
             text: formatString(t.embeds.newRecord.footer, {
-                date: now.toLocaleDateString(),
-                time: now.toLocaleTimeString()
+                date: recordTimestamp.toLocaleDateString(),
+                time: recordTimestamp.toLocaleTimeString()
             })
         });
 
@@ -1121,6 +1161,14 @@ async function announceNewRecords(client, db) {
                     log(`Announced record for ${record.username} in guild ${guildId}`);
                 } catch (sendError) {
                     log(`Failed to send record announcement in guild ${guildId}: ${sendError.message}`, 'error');
+                    
+                    // Still mark as "announced" to this guild to avoid infinite retries
+                    // The record will be eligible for other guilds
+                    await db.run(
+                        `INSERT OR IGNORE INTO guild_announcement_status (guild_id, record_id, ineligible_for_announcement) 
+                         VALUES (?, ?, 1)`,
+                        [guildId, record.record_id]
+                    );
                 }
 
                 await new Promise(r => setTimeout(r, 250));
@@ -1128,7 +1176,63 @@ async function announceNewRecords(client, db) {
         }
 
         if (announcedInAnyGuild.size > 0) {
-            await markRecordsAsAnnounced(db, Array.from(announcedInAnyGuild));
+            try {
+                await markRecordsAsAnnounced(db, Array.from(announcedInAnyGuild));
+                log(`Successfully marked ${announcedInAnyGuild.size} records as announced globally`);
+            } catch (markError) {
+                log(`Failed to mark records as announced: ${markError.message}`, 'error');
+                
+                const recordIds = Array.from(announcedInAnyGuild);
+                let successCount = 0;
+                
+                for (const recordId of recordIds) {
+                    try {
+                        await db.run('UPDATE records SET announced = 1 WHERE id = ?', [recordId]);
+                        successCount++;
+                    } catch (individualError) {
+                        log(`Failed to mark individual record ${recordId} as announced: ${individualError.message}`, 'error');
+                    }
+                }
+                
+                log(`Individually marked ${successCount}/${recordIds.length} records as announced`);
+            }
+        }
+
+        // Mark records as globally announced if they're ineligible for all guilds or have been processed
+        const allProcessedRecords = await db.all(`
+            SELECT DISTINCT r.id 
+            FROM records r 
+            WHERE r.announced = 0 
+            AND (
+                SELECT COUNT(DISTINCT gas.guild_id) 
+                FROM guild_announcement_status gas 
+                WHERE gas.record_id = r.id 
+                AND gas.ineligible_for_announcement = 1
+            ) >= (
+                SELECT COUNT(*) FROM guild_settings
+            )
+        `);
+
+        if (allProcessedRecords.length > 0) {
+            const recordIds = allProcessedRecords.map(r => r.id);
+            try {
+                await markRecordsAsAnnounced(db, recordIds);
+                log(`Marked ${recordIds.length} records as announced (ineligible for all guilds)`);
+            } catch (markError) {
+                log(`Failed to mark ineligible records as announced: ${markError.message}`, 'error');
+                
+                let successCount = 0;
+                for (const recordId of recordIds) {
+                    try {
+                        await db.run('UPDATE records SET announced = 1 WHERE id = ?', [recordId]);
+                        successCount++;
+                    } catch (individualError) {
+                        log(`Failed to mark individual ineligible record ${recordId} as announced: ${individualError.message}`, 'error');
+                    }
+                }
+                
+                log(`Individually marked ${successCount}/${recordIds.length} ineligible records as announced`);
+            }
         }
 
     } catch (error) {

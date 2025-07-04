@@ -490,11 +490,12 @@ export function createWeeklyShortEmbed(record, t) {
         );
     }
 
-    const now = new Date();
-    const dateStr = now.toLocaleDateString();
-    const timeStr = now.toLocaleTimeString();
+    // Use the actual record timestamp instead of current time
+    const recordTimestamp = record.recorded_at ? new Date(record.recorded_at * 1000) : new Date();
+    const dateStr = recordTimestamp.toLocaleDateString();
+    const timeStr = recordTimestamp.toLocaleTimeString();
 
-    embed.setTimestamp(now)
+    embed.setTimestamp(recordTimestamp)
         .setFooter({
             text: formatString(t.embeds.newRecord.footer, {
                 date: dateStr,
@@ -791,7 +792,7 @@ export async function checkWeeklyShorts(client, defaultMaxPosition = 10000) {
 
                     await db.run(
                         `UPDATE weekly_short_records 
-                         SET position = ?, timestamp = ?, recorded_at = datetime('now'), announced = 0
+                         SET position = ?, timestamp = ?, announced = 0
                          WHERE player_id = ? AND map_id = ?`,
                         [position, timestamp, player.id, dbMapId]
                     );
@@ -899,6 +900,7 @@ async function getUnannouncedWeeklyShorts(db, guildId = null) {
             m.name as map_name,
             m.thumbnail_url,
             r.position,
+            r.timestamp as recorded_at,
             h.previous_position
         FROM 
             weekly_short_records r
