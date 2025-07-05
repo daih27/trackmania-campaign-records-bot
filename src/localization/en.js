@@ -162,7 +162,6 @@ export default {
             title: '🏆 Recent Records: {username}',
             description: 'Your {count} most recent records:',
             time: '⏱️ Time',
-            setOn: '📅 Set on',
         },
         countryLeaderboard: {
             title: '🏆 {country} Leaderboard: {mapName}',

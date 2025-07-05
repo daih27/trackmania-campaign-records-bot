@@ -162,7 +162,6 @@ export default {
             title: '🏆 Récords Recientes: {username}',
             description: 'Tus {count} récords más recientes:',
             time: '⏱️ Tiempo',
-            setOn: '📅 Establecido el',
         },
         countryLeaderboard: {
             title: '🏆 Clasificación {country}: {mapName}',
@@ -210,7 +209,15 @@ export default {
             togglecampaignannouncements: '🔔 /togglecampaignannouncements',
             togglecampaignannouncementsDesc: 'Activar o desactivar anuncios de récords de campaña (solo admin/mod)',
             toggleweeklyshortsannouncements: '🔔 /toggleweeklyshortsannouncements',
-            toggleweeklyshortsannouncementsDesc: 'Activar o desactivar anuncios de weekly shorts (solo admin/mod)'
+            toggleweeklyshortsannouncementsDesc: 'Activar o desactivar anuncios de weekly shorts (solo admin/mod)',
+            setcampaignsearchtime: '⏰ /setcampaignsearchtime',
+            setcampaignsearchtimeDesc: 'Establecer el intervalo de búsqueda de campaña (solo usuarios autorizados)',
+            setweeklyshortssearchtime: '⏰ /setweeklyshortssearchtime',
+            setweeklyshortssearchtimeDesc: 'Establecer el intervalo de búsqueda de weekly shorts (solo usuarios autorizados)',
+            authorizeuser: '🔑 /authorizeuser',
+            authorizeuserDesc: 'Autorizar a un usuario para modificar configuraciones globales (solo usuarios autorizados)',
+            unauthorizeuser: '🔒 /unauthorizeuser',
+            unauthorizeuserDesc: 'Quitar autorización de usuario para configuraciones globales (solo usuarios autorizados)'
         },
         newRecord: {
             title: '{emoji} ¡Nuevo PB!',

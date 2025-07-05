@@ -309,11 +309,9 @@ async function handleRecords(interaction) {
           rh.player_id = r.player_id 
           AND rh.map_id = r.map_id 
           AND rh.time_ms = r.time_ms
-          AND rh.previous_time_ms IS NOT NULL
         )
       WHERE 
         r.player_id = ?
-        AND rh.previous_time_ms IS NOT NULL
       ORDER BY 
         r.recorded_at DESC
       LIMIT ?
@@ -331,9 +329,10 @@ async function handleRecords(interaction) {
             .setTimestamp(new Date())
 
         records.forEach((record, index) => {
+            let timeInfo = `${t.embeds.records.time}: **${formatTime(record.time_ms)}**`;
             embed.addFields({
                 name: `${index + 1}. ${record.map_name || record.map_uid}`,
-                value: `${t.embeds.records.time}: **${formatTime(record.time_ms)}**\n${t.embeds.records.setOn}: ${new Date(record.recorded_at + 'Z').toLocaleString()}`,
+                value: `${timeInfo}`,
                 inline: false
             });
         });
@@ -344,10 +343,6 @@ async function handleRecords(interaction) {
         await interaction.editReply(t.responses.records.error);
     }
 }
-
-/**
- * Handle leaderboard command - moved to handleLeaderboard.js
- */
 
 /**
  * Handles the /help command to display information about all available bot commands
