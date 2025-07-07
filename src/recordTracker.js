@@ -410,12 +410,10 @@ async function updateMapRecord(db, playerId, mapId, timeMs, playerRegisteredAt, 
             };
         }
         else {
-            // Parse database timestamp correctly - SQLite stores in UTC when using datetime('now', 'utc')
             const currentRecordDate = currentRecord.recorded_at ? 
                 new Date(currentRecord.recorded_at + 'Z') : 
                 new Date(0);
             
-            // Compare timestamps: Trackmania only submits records when they're improvements
             if (recordDate > currentRecordDate) {
                 try {
                     await db.run(
@@ -440,6 +438,20 @@ async function updateMapRecord(db, playerId, mapId, timeMs, playerRegisteredAt, 
                 );
 
                 const existedBeforeRegistration = recordDate < regDate;
+                
+                if (!existedBeforeRegistration && record) {
+                    try {
+                        await db.run(
+                            `DELETE FROM guild_announcement_status 
+                             WHERE record_id = ? AND (ineligible_for_announcement = 1 OR existed_before_registration = 1)`,
+                            [record.id]
+                        );
+                        log(`Cleared previous ineligible status for improved record ${record.id} (player ${playerId} on map ${mapId})`);
+                    } catch (clearError) {
+                        log(`Warning: Failed to clear previous ineligible status for record ${record.id}: ${clearError.message}`, 'warn');
+                    }
+                }
+                
                 log(`Improved record for player ${playerId} on map ${mapId}: ${timeMs}ms (was ${currentRecord.time_ms}ms, API: ${recordDate.toISOString()}, DB: ${currentRecordDate.toISOString()}, pre-existing: ${existedBeforeRegistration})`);
 
                 return {
@@ -928,7 +940,6 @@ export function createRecordEmbed(record, t, worldPosition = null) {
 
     const recordType = isImprovement ? t.embeds.newRecord.newPersonalBest : t.embeds.newRecord.firstRecord;
     
-    // Use the actual record timestamp instead of current time
     const recordTimestamp = record.recorded_at ? new Date(record.recorded_at + 'Z') : new Date();
 
     const finalThumbnailUrl = record.thumbnail_url && record.thumbnail_url.startsWith('http') ? record.thumbnail_url : null;
@@ -1162,8 +1173,6 @@ async function announceNewRecords(client, db) {
                 } catch (sendError) {
                     log(`Failed to send record announcement in guild ${guildId}: ${sendError.message}`, 'error');
                     
-                    // Still mark as "announced" to this guild to avoid infinite retries
-                    // The record will be eligible for other guilds
                     await db.run(
                         `INSERT OR IGNORE INTO guild_announcement_status (guild_id, record_id, ineligible_for_announcement) 
                          VALUES (?, ?, 1)`,
@@ -1198,7 +1207,6 @@ async function announceNewRecords(client, db) {
             }
         }
 
-        // Mark records as globally announced if they're ineligible for all guilds or have been processed
         const allProcessedRecords = await db.all(`
             SELECT DISTINCT r.id 
             FROM records r 
