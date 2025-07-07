@@ -490,8 +490,7 @@ export function createWeeklyShortEmbed(record, t) {
         );
     }
 
-    // Use the actual record timestamp instead of current time
-    const recordTimestamp = record.recorded_at ? new Date(record.recorded_at * 1000) : new Date();
+    const recordTimestamp = record.recorded_at ? new Date(record.recorded_at) : new Date();
     const dateStr = recordTimestamp.toLocaleDateString();
     const timeStr = recordTimestamp.toLocaleTimeString();
 
@@ -1015,7 +1014,7 @@ async function announceWeeklyShortUpdates(client, db) {
         }
 
         log(`Found ${allGloballyUnannounced.length} weekly short updates to process`);
-
+        
         const announcedInAnyGuild = new Set();
 
         for (const [guildId, guild] of guilds) {
@@ -1024,7 +1023,7 @@ async function announceWeeklyShortUpdates(client, db) {
                 log(`Weekly shorts announcements are disabled for guild ${guildId}`);
                 continue;
             }
-
+            
             const guildEligibleRecords = await getUnannouncedWeeklyShorts(db, guildId);
 
             if (guildEligibleRecords.length === 0) {
@@ -1090,7 +1089,7 @@ async function announceWeeklyShortUpdates(client, db) {
         }
 
         if (announcedInAnyGuild.size > 0) {
-            await markWeeklyShortsAsAnnounced(db, Array.from(announcedInAnyGuild));
+                await markWeeklyShortsAsAnnounced(db, Array.from(announcedInAnyGuild));
         }
 
     } catch (error) {
