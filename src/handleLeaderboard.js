@@ -6,6 +6,7 @@ import { invalidateTokens } from './auth.js';
 import { getDefaultCountry } from './guildSettings.js';
 import { apiQueue } from './utils/taskQueue.js';
 import { getZoneName } from './config/zones.js';
+import { cleanMapName } from './weeklyShorts.js';
 
 /**
  * Handles the /leaderboard command to display Trackmania leaderboards
@@ -80,17 +81,35 @@ async function handleLeaderboard(interaction) {
 
             let mapSearch;
             if (isMapNumber) {
-                const paddedNumber = mapName.padStart(2, '0');
+                const mapNumber = parseInt(mapName);
+                
                 mapSearch = await db.all(
                     "SELECT id, name, map_uid, thumbnail_url FROM maps WHERE (season_uid = ? OR (season_uid IS NULL AND ? IS NULL)) AND name LIKE ? LIMIT 1",
-                    [currentSeasonUid, currentSeasonUid, `%- ${paddedNumber}%`]
+                    [currentSeasonUid, currentSeasonUid, `%- ${mapNumber.toString().padStart(2, '0')}`]
                 );
 
                 if (mapSearch.length === 0) {
                     mapSearch = await db.all(
                         "SELECT id, name, map_uid, thumbnail_url FROM maps WHERE (season_uid = ? OR (season_uid IS NULL AND ? IS NULL)) AND name LIKE ? LIMIT 1",
-                        [currentSeasonUid, currentSeasonUid, `%- ${parseInt(mapName)}%`]
+                        [currentSeasonUid, currentSeasonUid, `%- ${mapNumber}`]
                     );
+                }
+                
+                if (mapSearch.length === 0) {
+                    const allMaps = await db.all(
+                        "SELECT id, name, map_uid, thumbnail_url FROM maps WHERE (season_uid = ? OR (season_uid IS NULL AND ? IS NULL))",
+                        [currentSeasonUid, currentSeasonUid]
+                    );
+                    
+                    const matchingMap = allMaps.find(map => {
+                        const cleanedName = cleanMapName(map.name);
+                        return cleanedName.match(new RegExp(`-\\s*${mapNumber.toString().padStart(2, '0')}$`)) ||
+                               cleanedName.match(new RegExp(`-\\s*${mapNumber}$`));
+                    });
+                    
+                    if (matchingMap) {
+                        mapSearch = [matchingMap];
+                    }
                 }
             } else {
                 mapSearch = await db.all(

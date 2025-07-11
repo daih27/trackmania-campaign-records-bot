@@ -15,7 +15,8 @@ import {
     fetchWeeklyShortSeasonLeaderboard,
     fetchWeeklyShortCountryLeaderboard,
     createWeeklyShortSeasonLeaderboardEmbed,
-    createWeeklyShortMapLeaderboardEmbed
+    createWeeklyShortMapLeaderboardEmbed,
+    cleanMapName
 } from './weeklyShorts.js';
 import { fetchMapInfo, fetchPlayerNames } from './recordTracker.js';
 import handleLeaderboard from './handleLeaderboard.js';
@@ -1220,15 +1221,14 @@ async function showWeeklyShortMapLeaderboard(interaction, mapName, countryCode, 
         if (isMapNumber) {
             const mapNumber = parseInt(mapName);
             matchingMap = dbMaps.find(map => {
-                if (map.name.match(new RegExp(`^${mapNumber}\s*-`))) {
-                    return true;
-                }
-                return map.position === mapNumber - 1;
+                const cleanedName = cleanMapName(map.name);
+                return cleanedName.match(new RegExp(`^${mapNumber}\\s*-\\s`));
             });
         } else {
-            matchingMap = dbMaps.find(map =>
-                map.name.toLowerCase().includes(mapName.toLowerCase())
-            );
+            matchingMap = dbMaps.find(map => {
+                const cleanedName = cleanMapName(map.name);
+                return cleanedName.toLowerCase().includes(mapName.toLowerCase());
+            });
         }
 
         if (!matchingMap) {
