@@ -322,8 +322,13 @@ async function handleRecords(interaction) {
             return await interaction.editReply(t.responses.records.noRecords);
         }
 
+        const playerName = player.username || 'Player';
+        const linkedPlayerName = player.account_id 
+            ? `[${playerName}](https://trackmania.io/player#/player/${player.account_id})`
+            : playerName;
+
         const embed = new EmbedBuilder()
-            .setTitle(formatString(t.embeds.records.title, { username: player.username || 'Player' }))
+            .setTitle(formatString(t.embeds.records.title, { username: linkedPlayerName }))
             .setColor(0x00BFFF)
             .setAuthor({ name: 'Trackmania Campaign Records', iconURL: TRACKMANIA_ICON_URL })
             .setDescription(formatString(t.embeds.records.description, { count: records.length }))

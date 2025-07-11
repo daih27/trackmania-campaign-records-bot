@@ -211,6 +211,9 @@ export async function createWeeklyShortSeasonLeaderboardEmbed(seasonName, countr
 
         records.forEach((record, index) => {
             const playerName = playerNames[record.accountId] || 'Unknown Player';
+            const linkedPlayerName = record.accountId 
+                ? `[${playerName}](https://trackmania.io/player#/player/${record.accountId})`
+                : playerName;
             const points = parseInt(record.sp) || 0;
             let pointsDifferential = '';
 
@@ -220,8 +223,8 @@ export async function createWeeklyShortSeasonLeaderboardEmbed(seasonName, countr
             }
 
             embed.addFields({
-                name: `#${index + 1}: ${playerName}`,
-                value: `${t.embeds.seasonLeaderboard.points}: **${points.toLocaleString()}${pointsDifferential}**\n${t.embeds.seasonLeaderboard.position}: #${record.position} ${t.embeds.seasonLeaderboard.worldwide}`,
+                name: '\u200b',
+                value: `**#${index + 1}: ${linkedPlayerName}**\n${t.embeds.seasonLeaderboard.points}: **${points.toLocaleString()}${pointsDifferential}**\n${t.embeds.seasonLeaderboard.position}: #${record.position} ${t.embeds.seasonLeaderboard.worldwide}`,
                 inline: false
             });
         });
@@ -267,11 +270,14 @@ export async function createWeeklyShortMapLeaderboardEmbed(mapName, mapUid, thum
     } else {
         records.forEach((record, index) => {
             const playerName = playerNames[record.accountId] || 'Unknown Player';
+            const linkedPlayerName = record.accountId 
+                ? `[${playerName}](https://trackmania.io/player#/player/${record.accountId})`
+                : playerName;
             const position = record.position || (index + 1);
 
             embed.addFields({
-                name: `#${index + 1}: ${playerName}`,
-                value: `${t.embeds.countryLeaderboard.position}: **#${position}** ${t.embeds.countryLeaderboard.worldwide}`,
+                name: '\u200b',
+                value: `**#${index + 1}: ${linkedPlayerName}**\n${t.embeds.countryLeaderboard.position}: **#${position}** ${t.embeds.countryLeaderboard.worldwide}`,
                 inline: false
             });
         });
@@ -451,11 +457,16 @@ export function createWeeklyShortEmbed(record, t) {
 
     const recordType = t.embeds.newRecord.newPersonalBest;
 
+    const playerName = record.username || 'Player';
+    const linkedUsername = record.account_id 
+        ? `[${playerName}](https://trackmania.io/player#/player/${record.account_id})`
+        : playerName;
+
     const embed = new EmbedBuilder()
         .setTitle(formatString(t.embeds.newRecord.title, { emoji }))
         .setColor(0xFF6B6B)
         .setDescription(formatString(t.embeds.newRecord.description, {
-            username: record.username || 'Player',
+            username: linkedUsername,
             discordId: record.discord_id,
             recordType
         }))
