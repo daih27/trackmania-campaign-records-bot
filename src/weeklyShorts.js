@@ -1005,7 +1005,6 @@ async function announceWeeklyShortUpdates(client, db) {
             return;
         }
         
-        const guilds = client.guilds.cache;
         const allGloballyUnannounced = await getUnannouncedWeeklyShorts(db);
 
         if (allGloballyUnannounced.length === 0) {
@@ -1017,17 +1016,39 @@ async function announceWeeklyShortUpdates(client, db) {
         
         const announcedInAnyGuild = new Set();
 
-        for (const [guildId, guild] of guilds) {
-            const isEnabled = await import('./guildSettings.js').then(module => module.getWeeklyShortsAnnouncementsStatus(guildId));
-            if (!isEnabled) {
-                log(`Weekly shorts announcements are disabled for guild ${guildId}`);
-                continue;
-            }
+        const recordsByGuild = new Map();
+        
+        for (const record of allGloballyUnannounced) {
+            const playerGuilds = await db.all(
+                'SELECT guild_id FROM players WHERE account_id = ?',
+                [record.account_id]
+            );
             
-            const guildEligibleRecords = await getUnannouncedWeeklyShorts(db, guildId);
+            for (const playerGuild of playerGuilds) {
+                const guildId = playerGuild.guild_id;
+                
+                const isEnabled = await import('./guildSettings.js').then(module => module.getWeeklyShortsAnnouncementsStatus(guildId));
+                if (!isEnabled) {
+                    log(`Weekly shorts announcements are disabled for guild ${guildId}, skipping player ${record.username}`);
+                    continue;
+                }
+                
+                const guildEligibleRecords = await getUnannouncedWeeklyShorts(db, guildId);
+                const isEligible = guildEligibleRecords.some(r => r.record_id === record.record_id);
+                
+                if (isEligible) {
+                    if (!recordsByGuild.has(guildId)) {
+                        recordsByGuild.set(guildId, []);
+                    }
+                    recordsByGuild.get(guildId).push(record);
+                }
+            }
+        }
 
-            if (guildEligibleRecords.length === 0) {
-                log(`No eligible weekly shorts for guild ${guildId}`);
+        for (const [guildId, records] of recordsByGuild) {
+            const guild = client.guilds.cache.get(guildId);
+            if (!guild) {
+                log(`Guild ${guildId} not found in client cache, skipping`);
                 continue;
             }
 
@@ -1055,7 +1076,7 @@ async function announceWeeklyShortUpdates(client, db) {
             const maxPositionThreshold = await getMinWorldPosition(guildId);
             const t = await getTranslations(guildId);
 
-            for (const record of guildEligibleRecords) {
+            for (const record of records) {
                 if (record.position === undefined || record.position === null) {
                     log(`Weekly short for ${record.username} has undefined position, marking as ineligible for guild ${guildId}`);
                     await db.run(
