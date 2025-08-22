@@ -502,16 +502,13 @@ export function createWeeklyShortEmbed(record, t) {
     }
 
     const recordTimestamp = record.recorded_at ? new Date(record.recorded_at) : new Date();
-    const dateStr = recordTimestamp.toLocaleDateString();
-    const timeStr = recordTimestamp.toLocaleTimeString();
+    
+    const unixTimestamp = Math.floor(recordTimestamp.getTime() / 1000);
+    embed.addFields(
+        { name: t.embeds.newRecord.recordSet, value: `<t:${unixTimestamp}:F>`, inline: false }
+    );
 
-    embed.setTimestamp(recordTimestamp)
-        .setFooter({
-            text: formatString(t.embeds.newRecord.footer, {
-                date: dateStr,
-                time: timeStr
-            })
-        });
+    embed.setTimestamp(recordTimestamp);
 
     return embed;
 }

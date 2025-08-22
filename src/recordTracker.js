@@ -385,9 +385,9 @@ async function updateMapRecord(db, playerId, mapId, timeMs, playerRegisteredAt, 
         if (!currentRecord) {
             try {
                 await db.run(
-                    `INSERT INTO record_history (player_id, map_id, time_ms, previous_time_ms) 
-                     VALUES (?, ?, ?, ?)`,
-                    [playerId, mapId, timeMs, null]
+                    `INSERT INTO record_history (player_id, map_id, time_ms, previous_time_ms, recorded_at) 
+                     VALUES (?, ?, ?, ?, ?)`,
+                    [playerId, mapId, timeMs, null, recordDate.getTime()]
                 );
             } catch (historyError) {
                 log(`Warning: Failed to insert record history for player ${playerId} on map ${mapId}: ${historyError.message}`, 'warn');
@@ -395,8 +395,8 @@ async function updateMapRecord(db, playerId, mapId, timeMs, playerRegisteredAt, 
 
             const result = await db.run(
                 `INSERT INTO records (player_id, map_id, time_ms, recorded_at, announced) 
-                 VALUES (?, ?, ?, datetime('now', 'utc'), 0)`,
-                [playerId, mapId, timeMs]
+                 VALUES (?, ?, ?, ?, 0)`,
+                [playerId, mapId, timeMs, recordDate.getTime()]
             );
 
             const recordId = result.lastID;
@@ -414,15 +414,15 @@ async function updateMapRecord(db, playerId, mapId, timeMs, playerRegisteredAt, 
         }
         else {
             const currentRecordDate = currentRecord.recorded_at ? 
-                new Date(currentRecord.recorded_at + 'Z') : 
+                new Date(currentRecord.recorded_at) : 
                 new Date(0);
             
             if (recordDate > currentRecordDate) {
                 try {
                     await db.run(
-                        `INSERT INTO record_history (player_id, map_id, time_ms, previous_time_ms) 
-                         VALUES (?, ?, ?, ?)`,
-                        [playerId, mapId, timeMs, currentRecord.time_ms]
+                        `INSERT INTO record_history (player_id, map_id, time_ms, previous_time_ms, recorded_at) 
+                         VALUES (?, ?, ?, ?, ?)`,
+                        [playerId, mapId, timeMs, currentRecord.time_ms, recordDate.getTime()]
                     );
                 } catch (historyError) {
                     log(`Warning: Failed to insert record history for player ${playerId} on map ${mapId}: ${historyError.message}`, 'warn');
@@ -430,9 +430,9 @@ async function updateMapRecord(db, playerId, mapId, timeMs, playerRegisteredAt, 
 
                 await db.run(
                     `UPDATE records 
-                     SET time_ms = ?, recorded_at = datetime('now', 'utc'), announced = 0
+                     SET time_ms = ?, recorded_at = ?, announced = 0
                      WHERE player_id = ? AND map_id = ?`,
-                    [timeMs, playerId, mapId]
+                    [timeMs, recordDate.getTime(), playerId, mapId]
                 );
 
                 const record = await db.get(
@@ -997,13 +997,12 @@ export function createRecordEmbed(record, t, worldPosition = null) {
         );
     }
 
-    embed.setTimestamp(recordTimestamp)
-        .setFooter({
-            text: formatString(t.embeds.newRecord.footer, {
-                date: recordTimestamp.toLocaleDateString(),
-                time: recordTimestamp.toLocaleTimeString()
-            })
-        });
+    const unixTimestamp = Math.floor(recordTimestamp.getTime() / 1000);
+    embed.addFields(
+        { name: t.embeds.newRecord.recordSet, value: `<t:${unixTimestamp}:F>`, inline: false }
+    );
+
+    embed.setTimestamp(recordTimestamp);
 
     return embed;
 }

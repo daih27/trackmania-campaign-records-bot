@@ -228,6 +228,7 @@ export default {
             time: '⏱️ Tiempo',
             worldPosition: '🌍 Posición Mundial',
             previous: '⏮️ Anterior',
+            recordSet: '📅 Récord Establecido',
             footer: 'Récord establecido el {date} a las {time}',
             places: 'posiciones',
             samePosition: 'Misma posición',
