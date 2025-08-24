@@ -222,7 +222,6 @@ export default {
         newRecord: {
             title: '{emoji} ¡Nuevo PB!',
             description: '**{username}** (<@{discordId}>) acaba de establecer {recordType}!',
-            firstRecord: 'su primer récord',
             newPersonalBest: 'un nuevo récord personal',
             map: '🗺️ Mapa',
             time: '⏱️ Tiempo',

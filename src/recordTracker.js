@@ -407,7 +407,7 @@ async function updateMapRecord(db, playerId, mapId, timeMs, playerRegisteredAt, 
 
             return {
                 improved: false,
-                isFirstRecord: true,
+                isNewRecord: true,
                 recordId: recordId,
                 existedBeforeRegistration: existedBeforeRegistration
             };
@@ -460,7 +460,7 @@ async function updateMapRecord(db, playerId, mapId, timeMs, playerRegisteredAt, 
                 return {
                     improved: true,
                     previousTime: currentRecord.time_ms,
-                    isFirstRecord: false,
+                    isNewRecord: false,
                     recordId: record ? record.id : null,
                     existedBeforeRegistration: existedBeforeRegistration
                 };
@@ -470,13 +470,13 @@ async function updateMapRecord(db, playerId, mapId, timeMs, playerRegisteredAt, 
         }
         return {
             improved: false,
-            isFirstRecord: false
+            isNewRecord: false
         };
     } catch (error) {
         log(`Error updating record: ${error.message}`, 'error');
         return {
             improved: false,
-            isFirstRecord: false,
+            isNewRecord: false,
             error: error.message
         };
     }
@@ -553,16 +553,18 @@ async function getUnannouncedRecords(db, guildId = null) {
       players p ON r.player_id = p.id
     JOIN 
       maps m ON r.map_id = m.id
-    LEFT JOIN 
-      record_history rh ON (
-        rh.player_id = r.player_id 
-        AND rh.map_id = r.map_id 
-        AND rh.recorded_at = (
-          SELECT MAX(recorded_at) 
-          FROM record_history 
-          WHERE player_id = r.player_id AND map_id = r.map_id
-        )
-      )
+    LEFT JOIN (
+      SELECT 
+        player_id, 
+        map_id, 
+        previous_time_ms,
+        ROW_NUMBER() OVER (PARTITION BY player_id, map_id ORDER BY recorded_at DESC) as rn
+      FROM record_history
+    ) rh ON (
+      rh.player_id = r.player_id 
+      AND rh.map_id = r.map_id 
+      AND rh.rn = 1
+    )
     WHERE 
       r.announced = 0`;
 
@@ -842,7 +844,7 @@ export async function checkRecords(client) {
                     const firstGuildPlayer = Array.from(guildEligibility.values())[0].player;
                     const result = await updateMapRecord(db, firstGuildPlayer.id, dbMapId, time, firstGuildPlayer.registered_at, recordTimestamp);
 
-                    if (result.isFirstRecord || result.improved) {
+                    if (result.isNewRecord || result.improved) {
                         playersWithUpdates.add(accountId);
 
                         if (result.recordId) {
@@ -877,7 +879,7 @@ export async function checkRecords(client) {
                             }
                         }
 
-                        if (result.isFirstRecord) {
+                        if (result.isNewRecord) {
                             const statusText = result.existedBeforeRegistration ? "(pre-existing)" : "(new)";
                             log(`New record discovered for ${accountId} on ${mapName}: ${time}ms ${statusText}`);
                         } else {
@@ -937,11 +939,10 @@ export async function checkRecords(client) {
  */
 export function createRecordEmbed(record, t, worldPosition = null) {
     const timeFormatted = formatTime(record.time_ms);
-    const isImprovement = record.previous_time_ms !== null;
 
     let emoji = '🏆';
 
-    const recordType = isImprovement ? t.embeds.newRecord.newPersonalBest : t.embeds.newRecord.firstRecord;
+    const recordType = t.embeds.newRecord.newPersonalBest;
     
     const recordTimestamp = record.recorded_at ? new Date(record.recorded_at) : new Date();
 
