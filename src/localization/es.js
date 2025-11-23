@@ -20,6 +20,8 @@ export default {
         setchannelOption: 'El canal donde se enviarán los anuncios de récords',
         setweeklyshortschannel: 'Establecer el canal para anuncios de weekly shorts',
         setweeklyshortschannelOption: 'El canal donde se enviarán los anuncios de weekly shorts',
+        settotdchannel: 'Establecer el canal para anuncios de clasificación de TOTD',
+        settotdchannelOption: 'El canal donde se enviarán los anuncios de clasificación de TOTD',
         weeklyshortsleaderboard: 'Mostrar la tabla de clasificación de weekly shorts',
         weeklyshortsleaderboardOption: 'Opcional: filtrar por nombre de mapa',
         weeklyshortsleaderboardCountryOption: 'Seleccionar un país',
@@ -29,6 +31,10 @@ export default {
         togglecampaignannouncementsOption: 'Activar o desactivar anuncios de campaña',
         toggleweeklyshortsannouncements: 'Activar o desactivar anuncios de weekly shorts',
         toggleweeklyshortsannouncementsOption: 'Activar o desactivar anuncios de weekly shorts',
+        toggletotdannouncements: 'Activar o desactivar anuncios de clasificación de TOTD',
+        toggletotdannouncementsOption: 'Activar o desactivar anuncios de TOTD',
+        totdleaderboard: 'Mostrar clasificación de TOTD',
+        totdleaderboardCountryOption: 'Seleccionar un país',
         setcampaignsearchtime: 'Establecer el intervalo de búsqueda de campaña (solo usuarios autorizados)',
         setcampaignsearchtimeOption: 'Intervalo de búsqueda en minutos (5-1440)',
         setweeklyshortssearchtime: 'Establecer el intervalo de búsqueda de weekly shorts (solo usuarios autorizados)',
@@ -95,6 +101,13 @@ export default {
             notText: '❌ El canal seleccionado debe ser un canal de texto.',
             processing: '🔄 Estableciendo el canal de anuncios de weekly shorts...'
         },
+        settotdchannel: {
+            noPermission: '❌ Necesitas permisos de administrador o moderador para usar este comando.',
+            changed: '✅ Los anuncios de clasificación de TOTD ahora se enviarán a {channel}',
+            error: '❌ No se pudo establecer el canal de anuncios de TOTD.',
+            notTextChannel: '❌ El canal seleccionado debe ser un canal de texto.',
+            processing: '🔄 Estableciendo el canal de anuncios de TOTD...'
+        },
         weeklyshortsleaderboard: {
             error: '❌ Ocurrió un error al obtener la tabla de clasificación de weekly shorts.',
             noSeasonRecords: 'No se encontraron jugadores de {country} en los weekly shorts actuales.',
@@ -125,6 +138,22 @@ export default {
             enabledStatus: 'activados',
             disabledStatus: 'desactivados',
             processing: '🔄 Actualizando la configuración de anuncios de weekly shorts...'
+        },
+        toggletotdannouncements: {
+            noPermission: '❌ Necesitas permisos de administrador o moderador para usar este comando.',
+            success: '✅ Los anuncios de TOTD han sido {status} para este servidor.',
+            error: '❌ No se pudo actualizar la configuración de anuncios de TOTD.',
+            alreadySet: 'Los anuncios de TOTD ya están {status} para este servidor.',
+            enabledStatus: 'activados',
+            disabledStatus: 'desactivados',
+            processing: '🔄 Actualizando la configuración de anuncios de TOTD...'
+        },
+        totdleaderboard: {
+            processing: '🔄 Obteniendo clasificación de TOTD...',
+            error: '❌ Ocurrió un error al obtener la clasificación de TOTD.',
+            noTOTD: '❌ No se encontró TOTD actual',
+            errorFetchingMap: '❌ No se pudo obtener información del mapa del TOTD actual',
+            noRecords: 'No se encontraron récords de {country} para el TOTD actual.'
         },
         setcampaignsearchtime: {
             noPermission: '❌ No estás autorizado para modificar configuraciones globales.',
@@ -210,6 +239,12 @@ export default {
             togglecampaignannouncementsDesc: 'Activar o desactivar anuncios de récords de campaña (solo admin/mod)',
             toggleweeklyshortsannouncements: '🔔 /toggleweeklyshortsannouncements',
             toggleweeklyshortsannouncementsDesc: 'Activar o desactivar anuncios de weekly shorts (solo admin/mod)',
+            settotdchannel: '📺 /settotdchannel',
+            settotdchannelDesc: 'Establecer el canal para anuncios de clasificación de TOTD (solo admin/mod)',
+            toggletotdannouncements: '🏁 /toggletotdannouncements',
+            toggletotdannouncementsDesc: 'Activar o desactivar anuncios de clasificación de TOTD (solo admin/mod)',
+            totdleaderboard: '🏆 /totdleaderboard',
+            totdleaderboardDesc: 'Mostrar clasificación de TOTD de tu país',
             setcampaignsearchtime: '⏰ /setcampaignsearchtime',
             setcampaignsearchtimeDesc: 'Establecer el intervalo de búsqueda de campaña (solo usuarios autorizados)',
             setweeklyshortssearchtime: '⏰ /setweeklyshortssearchtime',
@@ -233,6 +268,15 @@ export default {
             samePosition: 'Misma posición',
             improved: '↑ {count} posiciones',
             worsened: '↓ {count} posiciones'
+        },
+        totdLeaderboard: {
+            title: '🏁 Clasificación {country} de TOTD: {mapName}',
+            description: 'Top {count} tiempos de {country} para este TOTD',
+            time: '⏱️ Tiempo',
+            position: '🏁 Posición',
+            worldwide: 'mundial',
+            noRecords: 'Sin Récords',
+            noRecordsDesc: 'Ningún jugador de {country} ha establecido un tiempo en este TOTD.'
         }
     },
 

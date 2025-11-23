@@ -7,7 +7,7 @@ import { getDisplayNames } from './oauth.js';
 import { formatTime, log } from './utils.js';
 import { getDb, isUserAuthorized, addAuthorizedUser, removeAuthorizedUser, setCampaignCheckInterval, setWeeklyShortsCheckInterval } from './db.js';
 import { getTranslations, setLanguage, getAvailableLanguages, formatString } from './localization/index.js';
-import { setDefaultCountry, setAnnouncementChannel, setWeeklyShortsAnnouncementChannel, setMinWorldPosition, toggleCampaignAnnouncements, toggleWeeklyShortsAnnouncements, getCampaignAnnouncementsStatus, getWeeklyShortsAnnouncementsStatus } from './guildSettings.js';
+import { setDefaultCountry, setAnnouncementChannel, setWeeklyShortsAnnouncementChannel, setTOTDAnnouncementChannel, setMinWorldPosition, toggleCampaignAnnouncements, toggleWeeklyShortsAnnouncements, toggleTOTDAnnouncements, getCampaignAnnouncementsStatus, getWeeklyShortsAnnouncementsStatus, getTOTDAnnouncementsStatus } from './guildSettings.js';
 import { getZoneName, getAvailableCountries } from './config/zones.js';
 import { getDefaultCountry } from './guildSettings.js';
 import {
@@ -119,6 +119,14 @@ async function getCommands(t) {
                     .setRequired(true)),
 
         new SlashCommandBuilder()
+            .setName('settotdchannel')
+            .setDescription(t.commands.settotdchannel || 'Set the channel for TOTD leaderboard announcements')
+            .addChannelOption(option =>
+                option.setName('channel')
+                    .setDescription(t.commands.settotdchannelOption || 'The channel to send TOTD leaderboard announcements to')
+                    .setRequired(true)),
+
+        new SlashCommandBuilder()
             .setName('setminposition')
             .setDescription(t.commands.setminposition || 'Set the minimum world position to announce records')
             .addIntegerOption(option =>
@@ -142,6 +150,14 @@ async function getCommands(t) {
             .addBooleanOption(option =>
                 option.setName('enabled')
                     .setDescription(t.commands.toggleweeklyshortsannouncementsOption || 'Enable or disable weekly shorts announcements')
+                    .setRequired(true)),
+
+        new SlashCommandBuilder()
+            .setName('toggletotdannouncements')
+            .setDescription(t.commands.toggletotdannouncements || 'Toggle TOTD leaderboard announcements')
+            .addBooleanOption(option =>
+                option.setName('enabled')
+                    .setDescription(t.commands.toggletotdannouncementsOption || 'Enable or disable TOTD announcements')
                     .setRequired(true)),
 
         new SlashCommandBuilder()
@@ -179,7 +195,16 @@ async function getCommands(t) {
                 option.setName('user')
                     .setDescription(t.commands.unauthorizeuserOption || 'User to unauthorize')
                     .setRequired(true)),
-                    
+
+        new SlashCommandBuilder()
+            .setName('totdleaderboard')
+            .setDescription(t.commands.totdleaderboard || 'Show TOTD leaderboard')
+            .addStringOption(option =>
+                option.setName('country')
+                    .setDescription(t.commands.totdleaderboardCountryOption || 'Select a country')
+                    .setRequired(false)
+                    .setAutocomplete(true))
+
     ].map(command => command.toJSON());
 }
 
@@ -512,6 +537,10 @@ async function handleInteraction(interaction) {
                 case 'setweeklyshortschannel':
                     await handleSetWeeklyShortsChannel(interaction);
                     break;
+
+                case 'settotdchannel':
+                    await handleSetTOTDChannel(interaction);
+                    break;
                 case 'weeklyshortsleaderboard':
                     await handleWeeklyShortsLeaderboard(interaction);
                     break;
@@ -524,6 +553,10 @@ async function handleInteraction(interaction) {
                 case 'toggleweeklyshortsannouncements':
                     await handleToggleWeeklyShortsAnnouncements(interaction);
                     break;
+
+                case 'toggletotdannouncements':
+                    await handleToggleTOTDAnnouncements(interaction);
+                    break;
                 case 'setcampaignsearchtime':
                     await handleSetCampaignSearchTime(interaction);
                     break;
@@ -535,6 +568,9 @@ async function handleInteraction(interaction) {
                     break;
                 case 'unauthorizeuser':
                     await handleUnauthorizeUser(interaction);
+                    break;
+                case 'totdleaderboard':
+                    await handleTOTDLeaderboard(interaction);
                     break;
                 default:
                     await interaction.reply(t.responses.error.unknownCommand);
@@ -845,7 +881,6 @@ async function handleSetWeeklyShortsSearchTime(interaction) {
         const result = await setWeeklyShortsCheckInterval(intervalMs);
 
         if (result) {
-            // Restart the weekly shorts check schedule with new interval
             await restartWeeklyShortsSchedule();
             
             await interaction.editReply(
@@ -1139,6 +1174,185 @@ async function handleToggleWeeklyShortsAnnouncements(interaction) {
 }
 
 /**
+ * Handles the /settotdchannel command to set the TOTD announcement channel
+ * Admin/Moderator-only command
+ * @param {Interaction} interaction - Discord interaction object
+ */
+async function handleSetTOTDChannel(interaction) {
+    const t = await getTranslations(interaction.guildId);
+
+    if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator) &&
+        !interaction.member.permissions.has(PermissionFlagsBits.ModerateMembers)) {
+        return await interaction.reply({
+            content: t.responses.settotdchannel?.noPermission ||
+                'You need administrator or moderator permissions to use this command.',
+            ephemeral: true
+        });
+    }
+
+    try {
+        await interaction.reply(t.responses.settotdchannel?.processing || '🔄 Setting TOTD announcement channel...');
+        const channel = interaction.options.getChannel('channel');
+        const guildId = interaction.guildId;
+
+        if (!channel.isTextBased()) {
+            return await interaction.editReply(
+                t.responses.settotdchannel?.notTextChannel ||
+                'The selected channel must be a text channel.'
+            );
+        }
+
+        const result = await setTOTDAnnouncementChannel(guildId, channel.id);
+
+        if (!result) {
+            return await interaction.editReply(
+                t.responses.settotdchannel?.error ||
+                '❌ Failed to set the TOTD announcement channel.'
+            );
+        }
+
+        await interaction.editReply(
+            formatString(
+                t.responses.settotdchannel?.changed ||
+                '✅ TOTD leaderboard announcements will now be sent to {channel}',
+                { channel: `<#${channel.id}>` }
+            )
+        );
+    } catch (error) {
+        log(`Error in settotdchannel command: ${error.message}`, 'error');
+        await interaction.editReply(
+            t.responses.settotdchannel?.error ||
+            '❌ An error occurred while setting the channel.'
+        );
+    }
+}
+
+/**
+ * Handles the /toggletotdannouncements command to enable/disable TOTD announcements
+ * Admin/Moderator-only command
+ * @param {Interaction} interaction - Discord interaction object
+ */
+async function handleToggleTOTDAnnouncements(interaction) {
+    const t = await getTranslations(interaction.guildId);
+
+    if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator) &&
+        !interaction.member.permissions.has(PermissionFlagsBits.ModerateMembers)) {
+        return await interaction.reply({
+            content: t.responses.toggletotdannouncements?.noPermission ||
+                'You need administrator or moderator permissions to use this command.',
+            ephemeral: true
+        });
+    }
+
+    try {
+        await interaction.reply(t.responses.toggletotdannouncements?.processing || '🔄 Updating TOTD announcement settings...');
+        const enabled = interaction.options.getBoolean('enabled');
+        const guildId = interaction.guildId;
+
+        const currentStatus = await getTOTDAnnouncementsStatus(guildId);
+        if (currentStatus === enabled) {
+            const statusText = enabled ?
+                (t.responses.toggletotdannouncements?.enabledStatus || 'enabled') :
+                (t.responses.toggletotdannouncements?.disabledStatus || 'disabled');
+
+            return await interaction.editReply(
+                formatString(
+                    t.responses.toggletotdannouncements?.alreadySet ||
+                    `TOTD announcements are already {status} for this server.`,
+                    { status: statusText }
+                )
+            );
+        }
+
+        const result = await toggleTOTDAnnouncements(guildId, enabled);
+
+        if (result) {
+            const statusText = enabled ?
+                (t.responses.toggletotdannouncements?.enabledStatus || 'enabled') :
+                (t.responses.toggletotdannouncements?.disabledStatus || 'disabled');
+
+            await interaction.editReply(
+                formatString(
+                    t.responses.toggletotdannouncements?.success ||
+                    `✅ TOTD announcements have been {status} for this server.`,
+                    { status: statusText }
+                )
+            );
+        } else {
+            await interaction.editReply(
+                t.responses.toggletotdannouncements?.error ||
+                '❌ Failed to update TOTD announcement settings.'
+            );
+        }
+    } catch (error) {
+        log(`Error in toggletotdannouncements command: ${error.message}`, 'error');
+        await interaction.editReply(
+            t.responses.toggletotdannouncements?.error ||
+            '❌ An error occurred while updating TOTD announcement settings.'
+        );
+    }
+}
+
+/**
+ * Handles the /totdleaderboard command
+ * @param {Interaction} interaction - Discord interaction object
+ */
+async function handleTOTDLeaderboard(interaction) {
+    const t = await getTranslations(interaction.guildId);
+
+    try {
+        await interaction.reply(t.responses.totdleaderboard?.processing || '🔄 Fetching TOTD leaderboard...');
+
+        const totdModule = await import('./totdTracker.js');
+        const { fetchCurrentTOTD, fetchTOTDCountryLeaderboard, createTOTDLeaderboardEmbed } = totdModule;
+        const { fetchMapInfo } = await import('./recordTracker.js');
+
+        const currentTOTD = await fetchCurrentTOTD();
+        if (!currentTOTD) {
+            return await interaction.editReply(t.responses.totdleaderboard?.noTOTD || '❌ No current TOTD found');
+        }
+
+        const mapInfoList = await fetchMapInfo([currentTOTD.mapUid]);
+        if (!mapInfoList || mapInfoList.length === 0) {
+            return await interaction.editReply(t.responses.totdleaderboard?.errorFetchingMap || '❌ Could not fetch map info for current TOTD');
+        }
+
+        const mapInfo = mapInfoList[0];
+
+        let countryCode = interaction.options.getString('country');
+        if (!countryCode) {
+            countryCode = await getDefaultCountry(interaction.guildId);
+        }
+
+        const countryName = await getZoneName(countryCode);
+        const leaderboard = await fetchTOTDCountryLeaderboard(currentTOTD.mapUid, countryCode, 5);
+
+        if (!leaderboard || leaderboard.length === 0) {
+            return await interaction.editReply(
+                formatString(
+                    t.responses.totdleaderboard?.noRecords || 'No {country} records found for the current TOTD.',
+                    { country: countryName }
+                )
+            );
+        }
+
+        const embed = await createTOTDLeaderboardEmbed(
+            mapInfo.name,
+            currentTOTD.mapUid,
+            mapInfo.thumbnailUrl,
+            leaderboard,
+            countryName,
+            t
+        );
+
+        await interaction.editReply({ content: null, embeds: [embed] });
+    } catch (error) {
+        log(`Error in totdleaderboard command: ${error.message}`, 'error');
+        await interaction.editReply(t.responses.totdleaderboard?.error || '❌ An error occurred while fetching the TOTD leaderboard');
+    }
+}
+
+/**
  * Handles the /weeklyshortsleaderboard command
  * @param {Interaction} interaction - Discord interaction object
  */
@@ -1339,6 +1553,71 @@ export function initBot() {
             }, 'scheduled weekly shorts check');
         });
 
+        const scheduleTOTDCheck = () => {
+            const now = new Date();
+
+            const findUTCTimeFor19Paris = (targetDate) => {
+                const formatter = new Intl.DateTimeFormat('en-US', {
+                    timeZone: 'Europe/Paris',
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit',
+                    hour12: false
+                });
+
+                const parts = formatter.formatToParts(targetDate);
+                const get = (type) => parts.find(p => p.type === type)?.value;
+
+                const year = get('year');
+                const month = get('month');
+                const day = get('day');
+
+                for (let utcHour = 17; utcHour <= 21; utcHour++) {
+                    const candidate = new Date(`${year}-${month}-${day}T${utcHour}:01:00Z`);
+
+                    const parisFormatter = new Intl.DateTimeFormat('en-US', {
+                        timeZone: 'Europe/Paris',
+                        hour: 'numeric',
+                        hour12: false
+                    });
+                    const parisHour = parseInt(parisFormatter.format(candidate));
+
+                    if (parisHour === 19) {
+                        return candidate;
+                    }
+                }
+
+                return new Date(`${year}-${month}-${day}T18:01:00Z`);
+            };
+
+            let nextCheck = findUTCTimeFor19Paris(now);
+
+            if (nextCheck <= now) {
+                const tomorrow = new Date(now);
+                tomorrow.setDate(tomorrow.getDate() + 1);
+                nextCheck = findUTCTimeFor19Paris(tomorrow);
+            }
+
+            const msUntilCheck = nextCheck.getTime() - now.getTime();
+            const nextCheckParis = nextCheck.toLocaleString('en-US', {
+                timeZone: 'Europe/Paris',
+                hour12: false,
+                dateStyle: 'short',
+                timeStyle: 'medium'
+            });
+            log(`Next TOTD check scheduled for: ${nextCheckParis} Paris time (${nextCheck.toISOString()}) - in ${Math.round(msUntilCheck / 1000 / 60)} minutes`);
+
+            setTimeout(async () => {
+                recordCheckQueue.enqueue(async () => {
+                    await import('./totdTracker.js').then(module => module.checkTOTD(client));
+                }, 'scheduled TOTD check');
+
+                scheduleTOTDCheck();
+            }, msUntilCheck);
+        };
+
+        scheduleTOTDCheck();
+
         setTimeout(async () => {
             recordCheckQueue.enqueue(async () => {
                 await import('./recordTracker.js').then(module => module.checkRecords(client));
@@ -1355,6 +1634,21 @@ export function initBot() {
                 log(`Error queuing initial weekly shorts check: ${error.message}`, 'error');
             });
         }, INITIAL_RECORD_CHECK_DELAY + 5000);
+
+        setTimeout(async () => {
+            recordCheckQueue.enqueue(async () => {
+                await import('./totdTracker.js').then(module => module.checkTOTD(client));
+            }, 'initial TOTD check').catch((error) => {
+                log(`Error queuing initial TOTD check: ${error.message}`, 'error');
+            });
+        }, INITIAL_RECORD_CHECK_DELAY + 10000);
+
+        const dailyRecordUpdate = 24 * 60 * 60 * 1000;
+        scheduleTask('dailyTOTDRecordUpdate', dailyRecordUpdate, async () => {
+            recordCheckQueue.enqueue(async () => {
+                await import('./totdTracker.js').then(module => module.checkTOTD(client));
+            }, 'daily TOTD record update');
+        });
     });
 
     client.on('error', error => {

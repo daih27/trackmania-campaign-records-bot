@@ -341,3 +341,110 @@ export async function isAnyWeeklyShortsAnnouncementsEnabled() {
         return true;
     }
 }
+
+/**
+ * Set the TOTD announcement channel for a guild
+ * @param {string} guildId - Discord guild ID
+ * @param {string} channelId - Discord channel ID
+ * @returns {Promise<boolean>} - Success status
+ */
+export async function setTOTDAnnouncementChannel(guildId, channelId) {
+    try {
+        const db = await getDb();
+
+        const guild = await db.get('SELECT id FROM guild_settings WHERE guild_id = ?', guildId);
+
+        if (guild) {
+            await db.run(
+                'UPDATE guild_settings SET totd_channel_id = ?, updated_at = CURRENT_TIMESTAMP WHERE guild_id = ?',
+                [channelId, guildId]
+            );
+        } else {
+            await db.run(
+                'INSERT INTO guild_settings (guild_id, totd_channel_id) VALUES (?, ?)',
+                [guildId, channelId]
+            );
+        }
+
+        return true;
+    } catch (error) {
+        log(`Error setting TOTD announcement channel: ${error.message}`, 'error');
+        return false;
+    }
+}
+
+/**
+ * Toggle TOTD announcements for a guild
+ * @param {string} guildId - Discord guild ID
+ * @param {boolean} enabled - Whether to enable or disable TOTD announcements
+ * @returns {Promise<boolean>} - Success status
+ */
+export async function toggleTOTDAnnouncements(guildId, enabled) {
+    try {
+        const db = await getDb();
+
+        const guild = await db.get('SELECT id FROM guild_settings WHERE guild_id = ?', guildId);
+
+        if (guild) {
+            await db.run(
+                'UPDATE guild_settings SET totd_announcements_enabled = ?, updated_at = CURRENT_TIMESTAMP WHERE guild_id = ?',
+                [enabled ? 1 : 0, guildId]
+            );
+        } else {
+            await db.run(
+                'INSERT INTO guild_settings (guild_id, totd_announcements_enabled) VALUES (?, ?)',
+                [guildId, enabled ? 1 : 0]
+            );
+        }
+
+        return true;
+    } catch (error) {
+        log(`Error toggling TOTD announcements: ${error.message}`, 'error');
+        return false;
+    }
+}
+
+/**
+ * Get TOTD announcements status for a guild
+ * @param {string} guildId - Discord guild ID
+ * @returns {Promise<boolean>} - Whether TOTD announcements are enabled
+ */
+export async function getTOTDAnnouncementsStatus(guildId) {
+    try {
+        const db = await getDb();
+
+        const guild = await db.get('SELECT totd_announcements_enabled FROM guild_settings WHERE guild_id = ?', guildId);
+
+        if (!guild) {
+            await db.run(
+                'INSERT INTO guild_settings (guild_id, totd_announcements_enabled) VALUES (?, 0)',
+                [guildId]
+            );
+            return false;
+        }
+
+        return guild.totd_announcements_enabled === 1;
+    } catch (error) {
+        log(`Error getting TOTD announcements status: ${error.message}`, 'error');
+        return false;
+    }
+}
+
+/**
+ * Check if any guild has TOTD announcements enabled
+ * @returns {Promise<boolean>} - Whether any guild has TOTD announcements enabled
+ */
+export async function isAnyTOTDAnnouncementsEnabled() {
+    try {
+        const db = await getDb();
+
+        const result = await db.get(
+            'SELECT COUNT(*) as count FROM guild_settings WHERE totd_announcements_enabled = 1'
+        );
+
+        return result && result.count > 0;
+    } catch (error) {
+        log(`Error checking if any TOTD announcements are enabled: ${error.message}`, 'error');
+        return false;
+    }
+}

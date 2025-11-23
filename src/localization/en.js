@@ -20,6 +20,8 @@ export default {
         setchannelOption: 'The channel to send record announcements to',
         setweeklyshortschannel: 'Set the channel for weekly shorts announcements',
         setweeklyshortschannelOption: 'The channel to send weekly shorts announcements to',
+        settotdchannel: 'Set the channel for TOTD leaderboard announcements',
+        settotdchannelOption: 'The channel to send TOTD leaderboard announcements to',
         weeklyshortsleaderboard: 'Show weekly shorts leaderboard',
         weeklyshortsleaderboardOption: 'Optional: filter by map name',
         weeklyshortsleaderboardCountryOption: 'Select a country',
@@ -29,6 +31,10 @@ export default {
         togglecampaignannouncementsOption: 'Enable or disable campaign announcements',
         toggleweeklyshortsannouncements: 'Toggle weekly shorts announcements',
         toggleweeklyshortsannouncementsOption: 'Enable or disable weekly shorts announcements',
+        toggletotdannouncements: 'Toggle TOTD leaderboard announcements',
+        toggletotdannouncementsOption: 'Enable or disable TOTD announcements',
+        totdleaderboard: 'Show TOTD leaderboard',
+        totdleaderboardCountryOption: 'Select a country',
         setcampaignsearchtime: 'Set the campaign search interval (authorized users only)',
         setcampaignsearchtimeOption: 'Search interval in minutes (5-1440)',
         setweeklyshortssearchtime: 'Set the weekly shorts search interval (authorized users only)',
@@ -95,6 +101,13 @@ export default {
             notText: '❌ The selected channel must be a text channel.',
             processing: '🔄 Setting weekly shorts announcement channel...'
         },
+        settotdchannel: {
+            noPermission: '❌ You need administrator or moderator permissions to use this command.',
+            changed: '✅ TOTD leaderboard announcements will now be sent to {channel}',
+            error: '❌ Failed to set the TOTD announcement channel.',
+            notTextChannel: '❌ The selected channel must be a text channel.',
+            processing: '🔄 Setting TOTD announcement channel...'
+        },
         weeklyshortsleaderboard: {
             error: '❌ An error occurred while fetching the weekly shorts leaderboard.',
             noSeasonRecords: 'No {country} players found in the current weekly shorts.',
@@ -125,6 +138,22 @@ export default {
             enabledStatus: 'enabled',
             disabledStatus: 'disabled',
             processing: '🔄 Updating weekly shorts announcement settings...'
+        },
+        toggletotdannouncements: {
+            noPermission: '❌ You need administrator or moderator permissions to use this command.',
+            success: '✅ TOTD announcements have been {status} for this server.',
+            error: '❌ Failed to update TOTD announcement settings.',
+            alreadySet: 'TOTD announcements are already {status} for this server.',
+            enabledStatus: 'enabled',
+            disabledStatus: 'disabled',
+            processing: '🔄 Updating TOTD announcement settings...'
+        },
+        totdleaderboard: {
+            processing: '🔄 Fetching TOTD leaderboard...',
+            error: '❌ An error occurred while fetching the TOTD leaderboard.',
+            noTOTD: '❌ No current TOTD found',
+            errorFetchingMap: '❌ Could not fetch map info for current TOTD',
+            noRecords: 'No {country} records found for the current TOTD.'
         },
         setcampaignsearchtime: {
             noPermission: '❌ You are not authorized to modify global settings.',
@@ -210,6 +239,12 @@ export default {
             togglecampaignannouncementsDesc: 'Enable or disable campaign record announcements (admin/mod only)',
             toggleweeklyshortsannouncements: '🔔 /toggleweeklyshortsannouncements',
             toggleweeklyshortsannouncementsDesc: 'Enable or disable weekly shorts announcements (admin/mod only)',
+            settotdchannel: '📺 /settotdchannel',
+            settotdchannelDesc: 'Set the channel for TOTD leaderboard announcements (admin/mod only)',
+            toggletotdannouncements: '🏁 /toggletotdannouncements',
+            toggletotdannouncementsDesc: 'Enable or disable TOTD leaderboard announcements (admin/mod only)',
+            totdleaderboard: '🏆 /totdleaderboard',
+            totdleaderboardDesc: 'Show TOTD leaderboard for your country',
             setcampaignsearchtime: '⏰ /setcampaignsearchtime',
             setcampaignsearchtimeDesc: 'Set the campaign search interval (authorized users only)',
             setweeklyshortssearchtime: '⏰ /setweeklyshortssearchtime',
@@ -233,6 +268,15 @@ export default {
             samePosition: 'Same position',
             improved: '↑ {count} places',
             worsened: '↓ {count} places'
+        },
+        totdLeaderboard: {
+            title: '🏁 {country} TOTD Leaderboard: {mapName}',
+            description: 'Top {count} {country} times for this Track of the Day',
+            time: '⏱️ Time',
+            position: '🏁 Position',
+            worldwide: 'worldwide',
+            noRecords: 'No Records',
+            noRecordsDesc: 'No {country} players have set a time on this TOTD.'
         }
     },
 
