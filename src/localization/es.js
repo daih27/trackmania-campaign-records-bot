@@ -263,7 +263,6 @@ export default {
             worldPosition: '🌍 Posición Mundial',
             previous: '⏮️ Anterior',
             recordSet: '📅 Récord Establecido',
-            footer: 'Récord establecido el {date} a las {time}',
             places: 'posiciones',
             samePosition: 'Misma posición',
             improved: '↑ {count} posiciones',
@@ -271,7 +270,7 @@ export default {
         },
         totdLeaderboard: {
             title: '🏁 Clasificación {country} de TOTD: {mapName}',
-            description: 'Top {count} tiempos de {country} para este TOTD',
+            description: 'Top {count} tiempos de {country} para la última TOTD',
             time: '⏱️ Tiempo',
             position: '🏁 Posición',
             worldwide: 'mundial',

@@ -263,7 +263,6 @@ export default {
             worldPosition: '🌍 World Position',
             previous: '⏮️ Previous',
             recordSet: '📅 Record Set',
-            footer: 'Record set on {date} at {time}',
             places: 'places',
             samePosition: 'Same position',
             improved: '↑ {count} places',

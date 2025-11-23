@@ -287,8 +287,7 @@ export async function createTOTDLeaderboardEmbed(mapName, mapUid, thumbnailUrl, 
         .setDescription(formatString(
             t.embeds.totdLeaderboard?.description || 'Top {count} {country} times for this Track of the Day',
             { count: leaderboard.length, country: countryName }
-        ))
-        .setTimestamp(new Date());
+        ));
 
     if (thumbnailUrl && thumbnailUrl.startsWith('http')) {
         embed.setThumbnail(thumbnailUrl);

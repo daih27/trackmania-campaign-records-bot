@@ -197,8 +197,7 @@ export async function createWeeklyShortSeasonLeaderboardEmbed(seasonName, countr
         .setAuthor({ name: `Trackmania Weekly Shorts`, iconURL: TRACKMANIA_ICON_URL })
         .setDescription(t.embeds.seasonLeaderboard.description
             .replace('{count}', records.length)
-            .replace('{country}', countryName))
-        .setTimestamp(new Date());
+            .replace('{country}', countryName));
 
     if (records.length === 0) {
         embed.addFields({
@@ -254,8 +253,7 @@ export async function createWeeklyShortMapLeaderboardEmbed(mapName, mapUid, thum
         .setAuthor({ name: `Trackmania Weekly Shorts`, iconURL: TRACKMANIA_ICON_URL })
         .setDescription(t.embeds.countryLeaderboard.description
             .replace('{count}', records.length)
-            .replace('{country}', countryName))
-        .setTimestamp(new Date());
+            .replace('{country}', countryName));
 
     if (thumbnailUrl && thumbnailUrl.startsWith('http')) {
         embed.setThumbnail(thumbnailUrl);
@@ -502,13 +500,11 @@ export function createWeeklyShortEmbed(record, t) {
     }
 
     const recordTimestamp = record.recorded_at ? new Date(record.recorded_at) : new Date();
-    
+
     const unixTimestamp = Math.floor(recordTimestamp.getTime() / 1000);
     embed.addFields(
         { name: t.embeds.newRecord.recordSet, value: `<t:${unixTimestamp}:F>`, inline: false }
     );
-
-    embed.setTimestamp(recordTimestamp);
 
     return embed;
 }

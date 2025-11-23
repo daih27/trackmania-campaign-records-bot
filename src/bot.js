@@ -357,7 +357,6 @@ async function handleRecords(interaction) {
             .setColor(0x00BFFF)
             .setAuthor({ name: 'Trackmania Campaign Records', iconURL: TRACKMANIA_ICON_URL })
             .setDescription(formatString(t.embeds.records.description, { count: records.length }))
-            .setTimestamp(new Date())
 
         records.forEach((record, index) => {
             let timeInfo = `${t.embeds.records.time}: **${formatTime(record.time_ms)}**`;
@@ -457,7 +456,6 @@ async function handleHelp(interaction) {
                 value: t.embeds.help.unauthorizeuserDesc
             },
         )
-        .setTimestamp(new Date())
 
     await interaction.reply({ embeds: [embed] });
 }

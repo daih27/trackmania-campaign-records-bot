@@ -32,8 +32,7 @@ export async function createSeasonLeaderboardEmbed(seasonName, countryCode, reco
         .setDescription(formatString(t.embeds.seasonLeaderboard?.description || 'Top {count} {country} players in the current season:', {
             count: records.length,
             country: countryName
-        }))
-        .setTimestamp(new Date());
+        }));
 
     if (records.length === 0) {
         embed.addFields({
@@ -1003,8 +1002,6 @@ export function createRecordEmbed(record, t, worldPosition = null) {
         { name: t.embeds.newRecord.recordSet, value: `<t:${unixTimestamp}:F>`, inline: false }
     );
 
-    embed.setTimestamp(recordTimestamp);
-
     return embed;
 }
 
@@ -1025,8 +1022,7 @@ export async function createCountryLeaderboardEmbed(mapName, mapUid, thumbnailUr
         .setTitle(formatString(t.embeds.countryLeaderboard.title, { mapName: mapName || mapUid, country: countryName }))
         .setColor(0x00BFFF)
         .setAuthor({ name: `Trackmania Campaign Records`, iconURL: TRACKMANIA_ICON_URL })
-        .setDescription(formatString(t.embeds.countryLeaderboard.description, { count: records.length, country: countryName }))
-        .setTimestamp(new Date());
+        .setDescription(formatString(t.embeds.countryLeaderboard.description, { count: records.length, country: countryName }));
 
     if (thumbnailUrl && thumbnailUrl.startsWith('http')) {
         embed.setThumbnail(thumbnailUrl);
