@@ -695,7 +695,7 @@ export async function checkRecords(client) {
 
         const guildPlayerMap = new Map();
         const allAccountIds = new Set();
-        let lowestMinPosition = 10000;
+        let highestMinPosition = 0;
 
         for (const [guildId, guild] of guilds) {
             const guildPlayers = await getGuildPlayers(guildId);
@@ -705,8 +705,8 @@ export async function checkRecords(client) {
 
                 try {
                     const minPosition = await getMinWorldPosition(guildId);
-                    if (minPosition < lowestMinPosition) {
-                        lowestMinPosition = minPosition;
+                    if (minPosition > highestMinPosition) {
+                        highestMinPosition = minPosition;
                     }
                 } catch (error) {
                     log(`Error getting min position for guild ${guildId}: ${error.message}`, 'warn');
@@ -719,7 +719,8 @@ export async function checkRecords(client) {
             return;
         }
 
-        log(`Using minimum position threshold: ${lowestMinPosition} (from guild settings)`);
+        const maxPositionToCheck = highestMinPosition || 10000;
+        log(`Using maximum position threshold for scanning: ${maxPositionToCheck}`);
 
         const campaign = await fetchCurrentCampaign();
         const seasonId = campaign.leaderboardGroupUid;

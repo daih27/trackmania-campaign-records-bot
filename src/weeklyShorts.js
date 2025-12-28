@@ -562,22 +562,20 @@ export async function checkWeeklyShorts(client, defaultMaxPosition = 10000) {
         const mapList = await fetchMapInfo(mapUids);
         const accountIds = Array.from(allAccountIds);
 
-        let lowestMinPosition = defaultMaxPosition;
+        let highestMinPosition = 0;
 
         for (const [guildId] of guilds) {
             try {
                 const minPosition = await getMinWorldPosition(guildId);
-                if (minPosition < lowestMinPosition) {
-                    lowestMinPosition = minPosition;
+                if (minPosition > highestMinPosition) {
+                    highestMinPosition = minPosition;
                 }
             } catch (error) {
                 log(`Error getting min position for guild ${guildId}: ${error.message}`, 'warn');
             }
         }
 
-        log(`Using minimum position threshold: ${lowestMinPosition} (from guild settings)`);
-
-        const maxPositionToCheck = lowestMinPosition;
+        const maxPositionToCheck = highestMinPosition || defaultMaxPosition;
 
         for (let i = 0; i < mapList.length; i++) {
             const map = mapList[i];
@@ -794,13 +792,21 @@ export async function checkWeeklyShorts(client, defaultMaxPosition = 10000) {
                     );
 
                     await db.run(
-                        `UPDATE weekly_short_records 
+                        `UPDATE weekly_short_records
                          SET position = ?, timestamp = ?, announced = 0
                          WHERE player_id = ? AND map_id = ?`,
                         [position, timestamp, player.id, dbMapId]
                     );
 
                     log(`Updated record for ${accountId} on map ${mapPosition + 1}: #${position === null ? 'null' : position} (previous: #${previousPosition === null ? 'null' : previousPosition})`);
+
+                    if (timestamp > existingDbRecord.timestamp) {
+                        await db.run(
+                            `DELETE FROM guild_announcement_status WHERE weekly_short_record_id = ?`,
+                            [existingDbRecord.id]
+                        );
+                        log(`Cleared eligibility status for ${accountId} on map ${mapPosition + 1} due to record improvement (new timestamp: ${timestamp})`);
+                    }
                 } else {
                     await db.run(
                         `INSERT INTO weekly_short_history (player_id, map_id, position, previous_position, timestamp) 
